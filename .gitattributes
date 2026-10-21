@@ -1,0 +1,2 @@
+# Shell scripts run on the VPS, so they keep Unix line endings on every checkout.
+*.sh text eol=lf

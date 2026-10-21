@@ -1,0 +1,535 @@
+/*
+ * Drawing: the page, and the craft table beside it. Pens stand in a wooden
+ * tray and lift out when chosen; paper colours are little snipped chips;
+ * cut shapes and papers sit on the table ready to use. Replaces the older
+ * .tools / .tool / .crayon rules in app.css.
+ */
+
+/* ---------- The page ---------- */
+
+.board {
+  isolation: isolate;
+  background: #fffdf8;
+}
+
+.board-paper {
+  background: #fffdf8;
+}
+
+.board-canvas[data-tool='shape'],
+.board-canvas[data-tool='sticker'] {
+  cursor: copy;
+}
+
+.board-canvas[data-tool='erase'] {
+  cursor: cell;
+}
+
+/* ---------- The craft table ---------- */
+
+.tools {
+  container-type: inline-size;
+  display: block;
+  padding: 0.5rem 0.625rem 0.375rem;
+  background-color: var(--surface);
+  background-image: var(--texture);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sheet);
+}
+
+.tools-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.tools-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'pens pens pens'
+    'paper caption caption'
+    'strip strip strip'
+    'options options history';
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+}
+
+@container (min-width: 900px) {
+  .tools-inner {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'pens paper options options'
+      'strip strip strip history';
+    gap: 0.25rem 0.875rem;
+  }
+
+  .tools .tools-caption {
+    display: none;
+  }
+}
+
+/* The trays: a wooden groove the pens stand in, with a lip in front. */
+.tray {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: max-content;
+  height: 4.5rem;
+  padding: 0 0.25rem;
+  border-radius: 0.875rem;
+  background:
+    repeating-linear-gradient(92deg, rgb(120 80 40 / 0.05) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #cfb48a, #e6d2b0 55%, #ead8b8);
+  box-shadow:
+    inset 0 3px 7px rgb(70 45 15 / 0.32),
+    inset 0 -1px 0 rgb(255 255 255 / 0.4),
+    0 1px 0 rgb(255 255 255 / 0.6);
+  /* The pens stand up out of the tray; only their ends are hidden in it. */
+  clip-path: inset(-1.5rem -0.25rem 0 -0.25rem round 0 0 0.875rem 0.875rem);
+  margin-top: 0.5rem;
+}
+
+.tray::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 1.1rem;
+  border-radius: 0 0 0.875rem 0.875rem;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.05) 0 3px, transparent 3px 11px),
+    linear-gradient(180deg, #cba673, #b18755);
+  border-top: 1px solid rgb(255 240 210 / 0.55);
+  box-shadow: 0 -4px 6px -3px rgb(60 35 10 / 0.45);
+  pointer-events: none;
+}
+
+.tray-pens {
+  grid-area: pens;
+}
+
+.tray-paper {
+  grid-area: paper;
+  background:
+    repeating-linear-gradient(0deg, rgb(70 60 40 / 0.05) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, #bfc7b0, #d8decb 55%, #dde3d0);
+}
+
+.tray-paper::after {
+  background: linear-gradient(180deg, #8fa07f, #76876a);
+  border-top-color: rgb(235 245 220 / 0.5);
+}
+
+.tray-tool {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 2.75rem;
+  height: 4.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tray-tool svg {
+  display: block;
+  flex: none;
+  width: 2.5rem;
+  height: 5rem;
+  margin-top: 0.15rem;
+  filter: drop-shadow(1px 2px 1.5px rgb(45 28 10 / 0.38));
+  /* The foot of each tool stays inside the tray, under its lip. */
+  clip-path: inset(-1.5rem -1rem 0.9rem -1rem);
+  transform-origin: 50% 100%;
+  transition: transform var(--motion) var(--ease);
+}
+
+.tray-tool:hover svg {
+  transform: translateY(-0.2rem);
+}
+
+.tray-tool[aria-checked='true'] svg {
+  transform: translateY(-0.8rem) rotate(-6deg);
+  filter: drop-shadow(3px 6px 3px rgb(45 28 10 / 0.35));
+}
+
+.tray-tool:active svg {
+  transform: translateY(-0.55rem) rotate(-3deg);
+}
+
+.tray-tool:focus-visible {
+  outline: none;
+}
+
+.tray-tool:focus-visible::before {
+  content: '';
+  position: absolute;
+  inset: 0.2rem 0.1rem 1.4rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 var(--focus-ring) var(--focus);
+  pointer-events: none;
+}
+
+/* A handwritten-label feel: what is in your hand, and how it is set. */
+.tools-caption {
+  grid-area: caption;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+  margin: 0;
+  padding-top: 0.5rem;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.tools-caption strong,
+.tools-caption span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tools-caption strong {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.tools-caption span {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tools-history {
+  grid-area: history;
+  display: flex;
+  gap: 0.125rem;
+  justify-self: end;
+}
+
+/* ---------- Colours: a fan of snipped paper ---------- */
+
+.tools-strip {
+  grid-area: strip;
+  position: relative;
+  min-width: 0;
+  /* Never let the long fan of colours widen the trays' columns. */
+  contain: inline-size;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+/* Rows that scroll fade out only where there is more to find. */
+.tools-strip,
+.tools-options {
+  --fade-from: #000;
+  --fade-to: #000;
+  -webkit-mask-image: linear-gradient(90deg, var(--fade-from), #000 1.75rem, #000 calc(100% - 1.75rem), var(--fade-to));
+  mask-image: linear-gradient(90deg, var(--fade-from), #000 1.75rem, #000 calc(100% - 1.75rem), var(--fade-to));
+}
+
+.tools-strip:is([data-fade='start'], [data-fade='both']),
+.tools-options:is([data-fade='start'], [data-fade='both']),
+.tools-paired > .tools-group:is([data-fade='start'], [data-fade='both']) {
+  --fade-from: transparent;
+}
+
+.tools-strip:is([data-fade='end'], [data-fade='both']),
+.tools-options:is([data-fade='end'], [data-fade='both']),
+.tools-paired > .tools-group:is([data-fade='end'], [data-fade='both']) {
+  --fade-to: transparent;
+}
+
+/* On a narrow table, paper's two choices get a row each, so neither hides. */
+@container (max-width: 899.98px) {
+  .tools-options.tools-paired {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.125rem;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .tools .tools-options.tools-paired > .tools-group {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    position: relative;
+    padding-left: 0;
+    border-left: 0;
+    -webkit-mask-image: linear-gradient(90deg, var(--fade-from), #000 1.75rem, #000 calc(100% - 1.75rem), var(--fade-to));
+    mask-image: linear-gradient(90deg, var(--fade-from), #000 1.75rem, #000 calc(100% - 1.75rem), var(--fade-to));
+  }
+
+  .tools .tools-paired > .tools-group::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tools-colours,
+.tools-stickers {
+  display: flex;
+  width: max-content;
+  padding: 0.25rem 0.25rem 0.125rem;
+}
+
+.tools-strip::-webkit-scrollbar,
+.tools-options::-webkit-scrollbar {
+  display: none;
+}
+
+.colour-chip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  scroll-snap-align: center;
+  filter: drop-shadow(0 1px 1px rgb(45 28 10 / 0.38));
+  -webkit-tap-highlight-color: transparent;
+  transition: filter var(--motion-fast) var(--ease);
+}
+
+.colour-chip .chip {
+  display: block;
+  width: 1.875rem;
+  height: 1.875rem;
+  background-color: var(--chip);
+  background-image: url('/textures/paper-light.png');
+  background-size: 128px;
+  clip-path: var(--cut);
+  transform: rotate(var(--tilt));
+  transition: transform var(--motion-fast) var(--ease);
+}
+
+.colour-chip:hover .chip {
+  transform: rotate(var(--tilt)) translateY(-2px);
+}
+
+.colour-chip[aria-checked='true'] {
+  filter: drop-shadow(0 5px 3px rgb(45 28 10 / 0.36));
+}
+
+.colour-chip[aria-checked='true'] .chip {
+  transform: translateY(-3px) scale(1.2);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 12.5 4 4 8-9' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    url('/textures/paper-light.png');
+  background-size: 70%, 128px;
+  background-position: center, 0 0;
+  background-repeat: no-repeat, repeat;
+}
+
+.colour-chip[aria-checked='true'] .chip[data-light] {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 12.5 4 4 8-9' fill='none' stroke='%232a2420' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    url('/textures/paper-light.png');
+}
+
+.colour-chip .chip[data-light] {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+.colour-chip:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+
+/* ---------- Choices for the tool in hand ---------- */
+
+.tools-options {
+  grid-area: options;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.tools .tools-group {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+}
+
+.tools .tools-group + .tools-group {
+  padding-left: 0.375rem;
+  border-left: 1px dashed var(--divider);
+}
+
+.tools-options .tools-group + .tools-group {
+  margin-left: 0;
+}
+
+.tools-colours.tools-group,
+.tools-stickers.tools-group {
+  gap: 0;
+}
+
+.tool-size,
+.tool-paper,
+.tool-shape,
+.tools .tool-sticker {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+.tool-size:hover,
+.tool-paper:hover,
+.tool-shape:hover,
+.tools .tool-sticker:hover {
+  background: color-mix(in srgb, var(--sunken) 60%, transparent);
+}
+
+.tool-size[aria-checked='true'],
+.tool-paper[aria-checked='true'],
+.tool-shape[aria-checked='true'],
+.tools .tool-sticker[aria-checked='true'] {
+  background: var(--sunken);
+  border-color: var(--edge);
+  box-shadow: var(--shadow-inset);
+}
+
+.tool-size:active,
+.tool-paper:active,
+.tool-shape:active,
+.tools .tool-sticker:active {
+  transform: translateY(1px);
+}
+
+.tools .size-dot {
+  display: block;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.16),
+    0 1px 1px rgb(45 28 10 / 0.25);
+}
+
+.tools .size-dot[data-rubber] {
+  background: #f8eeea;
+  box-shadow:
+    inset 0 0 0 1.5px #8a7f78,
+    0 1px 1px rgb(45 28 10 / 0.25);
+}
+
+.size-strip {
+  display: block;
+  width: 1.9rem;
+  clip-path: polygon(0 12%, 12% 0, 25% 14%, 38% 2%, 52% 12%, 66% 0, 80% 13%, 92% 3%, 100% 10%, 100% 90%, 88% 100%, 74% 88%, 60% 99%, 46% 87%, 32% 100%, 18% 88%, 6% 98%, 0 86%);
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.2));
+}
+
+.size-emoji {
+  line-height: 1;
+}
+
+.paper-chip {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  clip-path: polygon(3% 5%, 48% 1%, 97% 4%, 99% 52%, 95% 97%, 50% 99%, 2% 95%, 1% 48%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+}
+
+.tool-paper {
+  filter: drop-shadow(0 1px 1px rgb(45 28 10 / 0.3));
+}
+
+.tool-shape svg {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  overflow: visible;
+  filter: drop-shadow(0.5px 1.5px 1px rgb(45 28 10 / 0.42));
+}
+
+.tools .tool-sticker {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* ---------- Dark ---------- */
+
+:root[data-scheme='dark'] .tray {
+  background:
+    repeating-linear-gradient(92deg, rgb(0 0 0 / 0.1) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #2f2419, #3e3123 55%, #44372a);
+  box-shadow:
+    inset 0 3px 7px rgb(0 0 0 / 0.55),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:root[data-scheme='dark'] .tray::after {
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.03) 0 3px, transparent 3px 11px),
+    linear-gradient(180deg, #6b5136, #574129);
+  border-top-color: rgb(255 220 170 / 0.18);
+}
+
+:root[data-scheme='dark'] .tray-paper {
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.1) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, #232a20, #30382c 55%, #343d30);
+}
+
+:root[data-scheme='dark'] .tray-paper::after {
+  background: linear-gradient(180deg, #4d5c42, #3f4d36);
+  border-top-color: rgb(220 240 200 / 0.15);
+}
+
+:root[data-scheme='dark'] .colour-chip,
+:root[data-scheme='dark'] .tool-paper {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.7));
+}
+
+/* Black paper still needs an edge on a dark table. */
+:root[data-scheme='dark'] .colour-chip .chip[data-dark] {
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.22);
+}
+
+:root[data-scheme='dark'] .colour-chip[aria-checked='true'] {
+  filter: drop-shadow(0 5px 3px rgb(0 0 0 / 0.6));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tray-tool[aria-checked='true'] svg {
+    transform: translateY(-0.8rem);
+  }
+}

@@ -1,0 +1,50 @@
+# Builds the Kitchen Table release for the VPS (Ubuntu 22.04) when a v* tag is
+# pushed, and attaches it to a GitHub release for deploy/deploy.ps1 to fetch.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # The same Ubuntu as the VPS, so the release's runtime matches its libraries.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '27'
+          elixir-version: '1.18'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the web app
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the release
+        working-directory: server
+        env:
+          MIX_ENV: prod
+        run: |
+          mix deps.get --only prod
+          mix release --overwrite
+
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tarball=kitchen-table-${GITHUB_REF_NAME}.tar.gz
+          tar -czf "$tarball" -C server/_build/prod/rel/family .
+          gh release create "$GITHUB_REF_NAME" "$tarball" --title "Kitchen Table $GITHUB_REF_NAME" --notes "Built from ${GITHUB_SHA::7}."

@@ -1,0 +1,183 @@
+import type { ComponentType } from 'react';
+import { api } from '../lib/api';
+import type { GuideSection } from './learn';
+import type { IconName } from '../components/icons';
+import { go } from '../lib/router';
+import type { Game, Me, Person, Room } from '../lib/types';
+
+export type Mode = 'coop' | 'versus';
+
+/** What a move sends: the whole new state, and whether the game has ended. */
+export interface Update<S> {
+  state: S;
+  status?: 'finished';
+  summary?: string;
+}
+
+export interface Play<S> {
+  /**
+   * Makes a move from the latest state. If someone else moved first, the
+   * latest state is fetched and `next` runs again on it; return null when the
+   * move no longer makes sense.
+   */
+  move: (next: (state: S, game: Game<S>) => Update<S> | null) => Promise<boolean>;
+  busy: boolean;
+  /** Live doodle games add strokes without a version check. */
+  append?: (key: string, item: Record<string, unknown>) => void;
+}
+
+export interface GameProps<S> {
+  game: Game<S>;
+  play: Play<S>;
+  me: Me;
+  people: Map<number, Person>;
+  room: Room | undefined;
+}
+
+export interface NewGame<S = unknown> {
+  mode: Mode;
+  seats: Record<string, number | 'team' | 'computer' | 'open'>;
+  state: S;
+  title?: string;
+  summary?: string;
+}
+
+export interface OptionsProps<O> {
+  value: O;
+  onChange: (o: O) => void;
+  mode: Mode;
+  room: Room;
+  me: Me;
+  people: Map<number, Person>;
+}
+
+export interface GameDef<S = any, O = any> {
+  type: string;
+  name: string;
+  emoji: string;
+  blurb: string;
+  /** Modes in order of preference; co-op first where there is one. */
+  modes: Mode[];
+  modeLabels?: Partial<Record<Mode, string>>;
+  modeIcons?: Partial<Record<Mode, IconName>>;
+  players: string;
+  defaults: (ctx: { me: Me; room: Room; mode: Mode }) => O;
+  Options?: ComponentType<OptionsProps<O>>;
+  /** May be async, e.g. to upload a photo or let the computer move first. */
+  create: (options: O, ctx: { me: Me; room: Room; mode: Mode; people: Map<number, Person> }) => NewGame<S> | Promise<NewGame<S>>;
+  ready?: (options: O) => boolean;
+  Board: ComponentType<GameProps<S>>;
+  /** One short line about where the game is at, for lists and chat cards. */
+  status?: (game: Game<S>, me: number, people: Map<number, Person>) => string;
+  /** How to play, from the book button above the board. */
+  guide?: GuideSection[];
+}
+
+export function nameOf(people: Map<number, Person>, id: unknown, me?: number): string {
+  if (id === me) return 'You';
+  if (typeof id === 'number') return people.get(id)?.name ?? 'Someone';
+  if (id === 'team') return 'The family';
+  if (id === 'computer') return 'The computer';
+  return 'Someone';
+}
+
+/** Joins names as "Mum, Dad and Mia". */
+export function listNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
+
+/**
+ * Versus games where people take turns or race use seats p1, p2, … in turn
+ * order. A seat holds a person, or 'open' until someone joins.
+ */
+export type PlayerSeat = number | 'open';
+
+export function playerSeats(players: PlayerSeat[]): Record<string, PlayerSeat> {
+  return Object.fromEntries(players.map((p, i) => [`p${i + 1}`, p]));
+}
+
+/** The player seats of a game in turn order. */
+export function seatOrder(seats: Record<string, unknown>): string[] {
+  return Object.keys(seats)
+    .filter((k) => /^p\d+$/.test(k))
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+}
+
+export function nextSeat(order: string[], seat: string): string {
+  return order[(order.indexOf(seat) + 1) % order.length];
+}
+
+export function seatOf(seats: Record<string, unknown>, id: number): string | undefined {
+  return seatOrder(seats).find((k) => seats[k] === id);
+}
+
+/** The keys with the top score: more than one when they tie. */
+export function leaders(scores: Record<string, number>, keys: string[] = Object.keys(scores)): string[] {
+  const top = Math.max(...keys.map((k) => scores[k] ?? 0));
+  return keys.filter((k) => (scores[k] ?? 0) === top);
+}
+
+/** Sorts best first and gives places, sharing them on a tie: 1, 2, 2, 4. */
+export function placings<T>(items: T[], compare: (a: T, b: T) => number): { item: T; place: number }[] {
+  const sorted = [...items].sort(compare);
+  const out: { item: T; place: number }[] = [];
+  sorted.forEach((item, i) => {
+    const place = i > 0 && compare(sorted[i - 1], item) === 0 ? out[i - 1].place : i + 1;
+    out.push({ item, place });
+  });
+  return out;
+}
+
+/** Takes an open seat in a game. */
+export function joinSeat(gameId: number, seat: string) {
+  return api.post(`/api/games/${gameId}/join`, { seat });
+}
+
+export function shuffle<T>(xs: T[], random = Math.random): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function pick<T>(xs: T[], random = Math.random): T {
+  return xs[Math.floor(random() * xs.length)];
+}
+
+export const doodlePrompts = [
+  'a castle in the clouds',
+  'a dog riding a bicycle',
+  'the best sandwich ever',
+  'a dragon who wants a friend',
+  'our house as a spaceship',
+  'a cat wearing a crown',
+  'a monster who loves flowers',
+  'a picnic on the moon',
+  'a unicorn at the seaside',
+  'a robot making pancakes',
+  'a teddy bear on holiday',
+  'a tree with a door in it',
+  'the silliest hat',
+  'a snail in a hurry',
+  'a pirate ship in the bath',
+  'a whale in the sky',
+  'a birthday cake for a giraffe',
+  'a snowman in summer',
+  'a superhero hamster',
+  'the garden at night',
+  'a penguin at the shops',
+  'a rainbow train',
+  'grandma as a wizard',
+  'a sleepy owl',
+  'a giant strawberry',
+  'a bear having a bath',
+];
+
+/** Starts a new game in a room and opens it, for "play again" buttons. */
+export async function startGame(roomId: number, type: string, made: NewGame) {
+  const res = await api.post<{ game: { id: number } }>(`/api/rooms/${roomId}/games`, { type, ...made });
+  go({ name: 'games', gameId: res.game.id });
+}

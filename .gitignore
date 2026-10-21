@@ -1,0 +1,40 @@
+# Node / Vite
+node_modules/
+dist/
+
+# Elixir / Phoenix
+_build/
+deps/
+*.ez
+erl_crash.dump
+
+# Local settings and secrets
+.env
+.env.*
+*.db
+*.db-*
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Kitchen Table: the data folder and the built web app
+server/data/
+server/priv/static/
+*.tsbuildinfo
+
+# The Android app build
+android/build/
+
+# Keys, certificates and signed builds: never commit these
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+*.apk
+
+# Editors
+.vscode/
+.idea/
+*.swp
