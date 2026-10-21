@@ -1,16 +1,18 @@
 // Backgammon explained as it's played: the race and the dice before a roll,
 // the bar and bearing off when they come up, and hitting and safe points as
 // checkers move. Tips teach the idea and leave the choice to the player.
-import type { GuideSection, Tip } from '../learn';
+import type { GuideSection, Lesson, Tip } from '../learn';
 import { canBearOff, count, legalFirstMoves, owner, winKind, type Move, type Position } from './rules';
 
 const RACE: Tip = {
   key: 'race',
+  basic: true,
   text: 'Backgammon is a race. Your checkers travel anticlockwise: right to left along the top, then left to right along the bottom, into your home in the bottom-right quarter. Get all 15 home, then bear them off.',
 };
 
 const DICE: Tip = {
   key: 'dice',
+  basic: true,
   text: 'Each die moves one checker that many points. You can use both dice on one checker or move two different ones. If a die can be used, it has to be.',
 };
 
@@ -54,6 +56,7 @@ export function pickTips(pos: Position, dests: Move[]): Tip[] {
     });
   tips.push({
     key: 'pick:points',
+    basic: true,
     text: "The gold points are where this checker can go with your dice. A point with two or more of their checkers is blocked, so you can't land there.",
   });
   return tips;
@@ -88,6 +91,25 @@ export function endTip(pos: Position): Tip | null {
     };
   return null;
 }
+
+/** Learn mode: what the other side did with their last roll, at the start of your turn. */
+export function theirTurnTip(roll: [number, number], moved: number, hit: boolean, who: string, key: string): Tip {
+  const dice = roll[0] === roll[1] ? `a double ${roll[0]}, so four moves of ${roll[0]}` : `${roll[0]} and ${roll[1]}`;
+  const what =
+    moved === 0
+      ? "but none of their checkers could move, so they've lost the turn."
+      : `and moved ${moved === 1 ? 'one checker' : `${moved} times`}.`;
+  const after = hit ? ' They hit one of your checkers, so it has to come back in from the bar first.' : '';
+  return { key: `their-turn:${key}`, text: `${who} rolled ${dice}, ${what}${after}` };
+}
+
+export const backgammonBasics: Lesson[] = [
+  { art: '🏁', title: 'A race home', text: 'Each player has 15 checkers. Race yours round the board into your home, the bottom-right quarter, then take them off. First to take off all 15 wins.' },
+  { art: '↩️', title: 'Which way', text: 'Your checkers travel anticlockwise: right to left along the top, then left to right along the bottom. Theirs go the other way.' },
+  { art: '🎲', title: 'Roll and move', text: "Roll the dice, then move a checker by each number. One checker can use both dice. A double gives you four moves." },
+  { art: '🛡️', title: 'Stay in pairs', text: "Two or more checkers on a point keep it safe, and they can't land there. A checker on its own can be hit and sent back to the start." },
+  { art: '👆', title: 'On this board', text: 'Tap Roll the dice, then a checker with a gold ring, then a gold point. At the start of your turn, a note says what the other side did.' },
+];
 
 export const backgammonGuide: GuideSection[] = [
   {

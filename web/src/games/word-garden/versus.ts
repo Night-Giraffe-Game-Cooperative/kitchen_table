@@ -4,10 +4,16 @@
 // earns a bonus bunch. Each player starts the same number of words, so nobody
 // gets an extra first go.
 import { leaders, listNames, nextSeat, placings, shuffle } from '../common';
+import type { Band } from '../bands';
 import { wordsFor, type Length } from './words';
 
 export const LIVES = 7;
 export const BONUS = 3;
+
+/** Suns for a word: more for younger players. Games from before age bands have seven. */
+export function livesFor(band?: Band): number {
+  return band ? { '5-7': 9, '8-10': 8, '11-13': 7, '14+': 6 }[band] : LIVES;
+}
 
 export interface WordPick {
   word: string;
@@ -51,14 +57,16 @@ export interface VersusState {
   scores: Record<string, number>; // seat -> flowers
   log: Turn[];
   played: Played[];
-  length: Length;
+  /** Word size, in games from before age bands. */
+  length?: Length;
+  band?: Band;
   pick: string;
 }
 
 /** Different words for a game, topped up from every category if one runs short. */
-export function chooseWords(category: string, length: Length, count: number, random = Math.random): WordPick[] {
+export function chooseWords(category: string, size: Band | Length, count: number, random = Math.random): WordPick[] {
   const seen = new Set<string>();
-  const pool = [...shuffle(wordsFor(category, length), random), ...shuffle(wordsFor('mixed', length), random), ...shuffle(wordsFor('mixed', 'any'), random)];
+  const pool = [...shuffle(wordsFor(category, size), random), ...shuffle(wordsFor('mixed', size), random), ...shuffle(wordsFor('mixed', 'any'), random)];
   const out: WordPick[] = [];
   for (const w of pool) {
     if (out.length >= count) break;
@@ -69,7 +77,7 @@ export function chooseWords(category: string, length: Length, count: number, ran
   return out;
 }
 
-export function newVersus(words: WordPick[], order: string[], o: { length: Length; pick: string }): VersusState {
+export function newVersus(words: WordPick[], order: string[], o: { band?: Band; length?: Length; pick: string }): VersusState {
   return {
     turn: order[0],
     words,
@@ -77,11 +85,11 @@ export function newVersus(words: WordPick[], order: string[], o: { length: Lengt
     guessed: [],
     wrong: [],
     by: {},
-    lives: LIVES,
+    lives: livesFor(o.band),
     scores: Object.fromEntries(order.map((s) => [s, 0])),
     log: [],
     played: [],
-    length: o.length,
+    ...(o.band ? { band: o.band } : { length: o.length ?? 'any' }),
     pick: o.pick,
   };
 }

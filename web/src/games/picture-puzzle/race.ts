@@ -3,6 +3,7 @@
 // own, the fewest swaps wins, and on a tie the quicker puzzler wins. Your time
 // runs from when you press Start to your last swap.
 import { listNames, placings, seatOrder, shuffle } from '../common';
+import type { Band } from '../bands';
 
 /** A shuffle where no piece starts in its own place. */
 export function scramble(n: number, random = Math.random): number[] {
@@ -47,6 +48,7 @@ export interface RaceState {
   start: number[];
   /** Seat -> that player's own board, once they press Start. */
   boards: Record<string, RaceBoard>;
+  band?: Band;
 }
 
 export function newRace(media: RaceState['media'], size: number, random = Math.random): RaceState {

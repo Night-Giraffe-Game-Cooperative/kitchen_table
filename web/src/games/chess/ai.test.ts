@@ -77,7 +77,7 @@ describe('chooseMove', () => {
     ["fool's mate, for black", toFen(play(START_FEN, 'f3 e5 g4')), 'Qh4#'],
     ['smothered', '6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1', 'Nf7#'],
   ];
-  for (const level of [2, 3] as const) {
+  for (const level of [2, 3, 4] as const) {
     for (const [name, fen, expected] of mates) {
       it(`level ${level} finds mate in one (${name})`, () => {
         expect(sanOf(parseFen(fen), level)).toBe(expected);
@@ -99,7 +99,7 @@ describe('chooseMove', () => {
   it('returns null when there are no moves, at every level', () => {
     const mated = play(START_FEN, 'f3 e5 g4 Qh4#');
     const stalemate = parseFen('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1');
-    for (const level of [1, 2, 3] as const) {
+    for (const level of [1, 2, 3, 4] as const) {
       expect(chooseMove(mated, level, seeded(1))).toBeNull();
       expect(chooseMove(stalemate, level, seeded(1))).toBeNull();
     }
@@ -108,7 +108,7 @@ describe('chooseMove', () => {
   it('plays the only legal move straight away', () => {
     const pos = parseFen('k6R/8/2K5/8/8/8/8/8 b - - 0 1');
     expect(legalMoves(pos)).toHaveLength(1);
-    for (const level of [1, 2, 3] as const) expect(sanOf(pos, level)).toBe('Ka7');
+    for (const level of [1, 2, 3, 4] as const) expect(sanOf(pos, level)).toBe('Ka7');
   });
 
   it('never mutates the position', () => {
@@ -127,6 +127,18 @@ describe('chooseMove', () => {
       expect(move).not.toBeNull();
       expect(isLegal(pos, move as Move)).toBe(true);
       expect(took).toBeLessThan(1500);
+    }
+  });
+
+  it('level 4, for 14 and up, thinks for longer but still answers within about two seconds', () => {
+    for (const fen of [START_FEN, KIWIPETE]) {
+      const pos = parseFen(fen);
+      const started = performance.now();
+      const move = chooseMove(pos, 4, seeded(7));
+      const took = performance.now() - started;
+      expect(move).not.toBeNull();
+      expect(isLegal(pos, move as Move)).toBe(true);
+      expect(took).toBeLessThan(2500);
     }
   });
 

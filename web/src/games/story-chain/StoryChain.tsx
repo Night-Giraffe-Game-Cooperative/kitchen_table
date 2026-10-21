@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Field, Segmented, TextArea } from '../../components/ui';
 import { Avatar } from '../../components/ui';
 import { Icon } from '../../components/icons';
@@ -7,6 +7,9 @@ import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, nextSeat, pick, playerSeats, seatOf, seatOrder, startGame } from '../common';
 import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers } from '../word-garden/Players';
+import { bandOf, type Band } from '../bands';
+import { HINT, TipNote, useLearn, useTips } from '../learn';
+import { TIPS, helpFor, ideaFor, isStarter, lineHint, partOf, shape, startersFor, storyBasics, writingTips, type Help, type Part } from './help';
 import {
   addLine,
   bestLines,
@@ -29,6 +32,7 @@ interface CoopState {
   starter: string;
   lines: Line[];
   length: number;
+  band?: Band;
 }
 
 type State = CoopState | StoryVersus;
@@ -41,19 +45,6 @@ interface Options {
   /** Lines each player writes in versus. */
   each: number;
 }
-
-const starters = [
-  'Once upon a time, a small dragon found a door in the bottom of the garden.',
-  'On the first day of the holidays, the teddy bears woke up before everyone else.',
-  'Nobody believed Gran when she said the cat could talk.',
-  'The rain had been falling for three days when the boat appeared in the kitchen.',
-  'Deep in the wood there was a tree with a round green door and a lantern.',
-  'The unicorn had lost her shoes, and the party started at four o\'clock.',
-  'When the moon came down to visit, it landed right on our trampoline.',
-  'The family woke up to find the house had floated up into the clouds.',
-  'A very polite spider moved into the bathroom and asked for a towel.',
-  'The dog dug a hole so deep that he reached the other side of the world.',
-];
 
 const MIN_LINES = 4;
 
@@ -87,6 +78,76 @@ function ReadAloud({ text }: { text: string }) {
   );
 }
 
+/** Learn mode: the three parts of a story, with the one being written now picked out. */
+function StoryShape({ part }: { part: Part }) {
+  return (
+    <ol className="story-shape" aria-label="The shape of a story">
+      {(['beginning', 'middle', 'end'] as Part[]).map((p) => (
+        <li key={p} aria-current={p === part ? 'step' : undefined}>
+          <strong>{shape[p].title}</strong>
+          <span>{shape[p].text}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Under the writing box: words to start a line with, and an Idea button, as the age band allows. */
+function WritingHelp({ help, empty, onStart, onIdea }: { help: Help; empty: boolean; onStart: (word: string) => void; onIdea: () => void }) {
+  if (!help.ideas && !(help.openers.length && empty)) return null;
+  return (
+    <div className="story-help">
+      {help.openers.length > 0 && empty && (
+        <div className="story-openers" role="group" aria-label="Start your line with">
+          {help.openers.map((w) => (
+            <button key={w} type="button" className="story-opener" onClick={() => onStart(w)}>
+              {w}
+            </button>
+          ))}
+        </div>
+      )}
+      {help.ideas && (
+        <Button size="sm" variant="ghost" icon="sparkle" onClick={onIdea}>
+          Idea
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** Tips, the Idea button and learn mode's story shape, for whoever is about to write line `lineNo`. */
+function useWritingHelp(band: Band, lineNo: number, length: number, writing: boolean) {
+  const learn = useLearn('story_chain');
+  const tips = useTips('story_chain', { band, learn });
+  const help = helpFor(band, learn);
+  const part = partOf(lineNo, length);
+  const form = useRef<HTMLFormElement>(null);
+  const lastIdea = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (writing) tips.offer(...writingTips(lineNo, length));
+    else if (tips.tip?.key !== HINT) tips.dismiss();
+    // When the line to write changes.
+  }, [lineNo, writing, tips.offer]);
+
+  function idea() {
+    lastIdea.current = ideaFor(part, lastIdea.current);
+    tips.show({ key: HINT, text: lastIdea.current });
+  }
+
+  /** Puts a starting word in the box, ready to carry on typing. */
+  function starter(setText: (t: string) => void) {
+    return (word: string) => {
+      setText(`${word} `);
+      const box = form.current?.querySelector('textarea');
+      box?.focus();
+      requestAnimationFrame(() => box?.setSelectionRange(box.value.length, box.value.length));
+    };
+  }
+
+  return { learn, tips, help, part, form, idea, starter };
+}
+
 function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   const s = game.state;
   const [text, setText] = useState('');
@@ -96,6 +157,9 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   const wroteLast = last?.u === me.id;
   const canPlay = me.permissions.play_games && !done;
   const left = s.length - s.lines.length;
+  const band = bandOf(s);
+  const writing = canPlay && !(wroteLast && !anyway);
+  const w = useWritingHelp(band, s.lines.length + 1, s.length, writing);
 
   const story = [s.starter, ...s.lines.map((l) => l.text)].join(' ');
 
@@ -140,7 +204,7 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
       </article>
 
       <div className="story-tools">
-        <div className="story-writers" aria-label="Writers">
+        <div className="story-writers" role="group" aria-label="Writers">
           {[...new Set(s.lines.map((l) => l.u))].map((id) => (
             <span key={id} className="story-writer">
               <Avatar person={people.get(id)} size="xs" />
@@ -151,6 +215,8 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
         <ReadAloud text={story + (done ? ' The end.' : '')} />
       </div>
 
+      {writing && w.learn && <StoryShape part={w.part} />}
+      {canPlay && <TipNote tip={w.tips.tip} onClose={w.tips.dismiss} />}
       {canPlay &&
         (wroteLast && !anyway ? (
           <div className="notice notice-info">
@@ -160,10 +226,11 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
             </Button>
           </div>
         ) : (
-          <form className="story-add stack" onSubmit={add}>
-            <Field label="What happens next?" hint={left === 1 ? 'This is the last line, so make it a good ending!' : `${left} lines to go.`}>
+          <form ref={w.form} className="story-add stack" onSubmit={add}>
+            <Field label="What happens next?" hint={lineHint(s.lines.length + 1, s.length, w.help, `${left} lines to go.`)}>
               {(p) => <TextArea {...p} rows={2} maxLength={240} value={text} onChange={(e) => setText(e.target.value)} />}
             </Field>
+            <WritingHelp help={w.help} empty={!text.trim()} onStart={w.starter(setText)} onIdea={w.idea} />
             <div className="row">
               <Button type="submit" variant="primary" icon="pen" busy={play.busy} disabled={!text.trim()}>
                 Add to the story
@@ -207,6 +274,13 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
   const story = [s.starter, ...s.lines.map((l) => l.text)].join(' ');
   const myStars = Object.values(s.stars).filter((v) => v.includes(me.id)).length;
   const seatFor = (id: number) => seatOf(game.seats, id) ?? '';
+  const band = bandOf(s);
+  const w = useWritingHelp(band, lineNo, s.length, myTurn);
+  const tips = w.tips;
+
+  useEffect(() => {
+    if (starring && mine && !iAmDone) tips.offer(TIPS.stars);
+  }, [starring, iAmDone, tips.offer]);
 
   function finish(next: StoryVersus, g: Game<StoryVersus>): Update<StoryVersus> {
     return { state: next, status: 'finished', summary: storySummary(next, playersOf(g), (id) => nameOf(people, id)) };
@@ -248,8 +322,8 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
     try {
       const turned = [...players.slice(1), ...players.slice(0, 1)];
       const seats = playerSeats(turned);
-      const starter = pick(starters.filter((x) => x !== s.starter));
-      await startGame(game.room_id, 'story_chain', { mode: 'versus', seats, state: newStory(starter, s.each, seatOrder(seats)) });
+      const starter = pick(startersFor[band].filter((x) => x !== s.starter));
+      await startGame(game.room_id, 'story_chain', { mode: 'versus', seats, state: { ...newStory(starter, s.each, seatOrder(seats)), band: s.band } });
     } finally {
       setAgain(false);
     }
@@ -307,7 +381,7 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
       </article>
 
       <div className="story-tools">
-        <div className="story-writers" aria-label="Writers">
+        <div className="story-writers" role="group" aria-label="Writers">
           {players.map((id) => (
             <span key={id} className="story-writer">
               <Avatar person={people.get(id)} size="xs" />
@@ -318,18 +392,14 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
         <ReadAloud text={story + (writing ? '' : ' The end.')} />
       </div>
 
+      {myTurn && w.learn && <StoryShape part={w.part} />}
+      <TipNote tip={tips.tip} onClose={tips.dismiss} />
       {myTurn && (
-        <form className="story-add stack" onSubmit={add}>
-          <Field
-            label="Your line"
-            hint={
-              lineNo === s.length
-                ? 'This is the very last line, so make it a good ending!'
-                : `Line ${lineNo} of ${s.length}. After you, it's ${who(nextSeat(order, mine!))}'s turn.`
-            }
-          >
+        <form ref={w.form} className="story-add stack" onSubmit={add}>
+          <Field label="Your line" hint={lineHint(lineNo, s.length, w.help, `Line ${lineNo} of ${s.length}. After you, it's ${who(nextSeat(order, mine!))}'s turn.`)}>
             {(p) => <TextArea {...p} rows={2} maxLength={240} value={text} onChange={(e) => setText(e.target.value)} />}
           </Field>
+          <WritingHelp help={w.help} empty={!text.trim()} onStart={w.starter(setText)} onIdea={w.idea} />
           <div className="row">
             <Button type="submit" variant="primary" icon="pen" busy={play.busy} disabled={!text.trim()}>
               Add to the story
@@ -437,7 +507,7 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
+function Options({ value, onChange, mode, room, me, people, band }: OptionsProps<Options>) {
   return (
     <>
       {mode === 'versus' && (
@@ -452,7 +522,7 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
       <Field label="How the story starts" hint="Write your own, or use this one.">
         {(p) => <TextArea {...p} rows={3} maxLength={240} value={value.starter} onChange={(e) => onChange({ ...value, starter: e.target.value })} />}
       </Field>
-      <Button size="sm" variant="ghost" icon="refresh" onClick={() => onChange({ ...value, starter: pick(starters.filter((x) => x !== value.starter)) })}>
+      <Button size="sm" variant="ghost" icon="refresh" onClick={() => onChange({ ...value, starter: pick(startersFor[band].filter((x) => x !== value.starter)) })}>
         Another idea
       </Button>
       {mode === 'versus' ? (
@@ -496,7 +566,8 @@ export const storyChain: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or 2 to 6 taking turns',
-  defaults: ({ me, room, mode }) => ({ mode, starter: pick(starters), length: 8, players: defaultPlayers(room, me), each: 2 }),
+  defaults: ({ me, room, mode, band }) => ({ mode, starter: pick(startersFor[band]), length: 8, players: defaultPlayers(room, me), each: 2 }),
+  rebanded: (o, band) => (isStarter(o.starter) ? { ...o, starter: pick(startersFor[band]) } : o),
   ready: (o) => o.starter.trim().length > 0 && (o.mode !== 'versus' || o.players.length > 0),
   Options,
   create: (o, { me, mode }) => {
@@ -504,6 +575,13 @@ export const storyChain: GameDef<State, Options> = {
     const seats = playerSeats([me.id, ...o.players]);
     return { mode, seats, state: newStory(o.starter.trim(), o.each, seatOrder(seats)) };
   },
+  bands: {
+    '5-7': 'Short, simple story starts, words to begin a line with, and ideas when you get stuck.',
+    '8-10': 'Story starts with a twist, words to begin a line with, and ideas when you get stuck.',
+    '11-13': 'Mysterious story starts, and ideas when you get stuck.',
+    '14+': 'Story starts for older writers, and no help.',
+  },
+  basics: storyBasics,
   Board,
   guide: [
     { title: 'The aim', body: 'Write a story together, one line at a time, then read the whole thing aloud.' },

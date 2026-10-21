@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { explainMove, pieceTips, turnTips } from './learn';
+import { explainMove, pieceTips, riskOf, theirMoveTip, turnTips } from './learn';
 import { START_FEN, makeMove, movesFrom, parseFen, squareIndex as sq, type Move } from './rules';
 
 const mv = (from: string, to: string): Move => ({ from: sq(from), to: sq(to) });
@@ -55,5 +55,33 @@ describe('hints say why', () => {
     expect(why('4k3/8/8/8/1p6/2N5/8/4K3 w - - 0 1', 'c3', 'e2')).toMatch(/was under attack on c3, and on e2 it's safe/);
     // From c7 the knight forks the king and the rook.
     expect(why('r3k3/8/8/1N6/8/8/8/4K3 w - - 0 1', 'b5', 'c7')).toMatch(/check.*attacks their rook/);
+  });
+});
+
+describe('learn mode', () => {
+  it("explains the other side's move at the start of your turn", () => {
+    const tip = theirMoveTip(parseFen(START_FEN), mv('e2', 'e4'), 'The computer');
+    expect(tip.key).toBe('their-move:1w');
+    expect(tip.text).toBe('The computer moved their pawn from e2 to e4.');
+    const took = theirMoveTip(parseFen('4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1'), mv('d2', 'd5'), 'Sam');
+    expect(took.text).toMatch(/^Sam moved their rook from d2 to d5\. It took your queen\./);
+  });
+
+  it('warns before leaving a piece where it can be taken for nothing', () => {
+    expect(riskOf(parseFen('4k3/8/8/r7/8/8/8/4K2Q w - - 0 1'), mv('h1', 'h5'))).toBe(
+      'Your queen could be taken on h5, and nothing of yours guards that square.',
+    );
+  });
+
+  it('warns before a guarded piece can be taken by something worth less', () => {
+    expect(riskOf(parseFen('4k3/8/8/3p4/8/2N2P2/8/4K3 w - - 0 1'), mv('c3', 'e4'))).toBe(
+      'Their pawn could take your knight on e4, and a pawn is worth less than a knight.',
+    );
+  });
+
+  it('stays quiet about fair moves, pawns and the king', () => {
+    expect(riskOf(parseFen('4k3/8/8/3p4/8/2N2P2/8/4K3 w - - 0 1'), mv('c3', 'b5'))).toBeNull();
+    expect(riskOf(parseFen(START_FEN), mv('e2', 'e4'))).toBeNull();
+    expect(riskOf(parseFen('4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1'), mv('d2', 'd5'))).toBeNull();
   });
 });

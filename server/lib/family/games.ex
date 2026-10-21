@@ -188,6 +188,34 @@ defmodule Family.Games do
     end)
   end
 
+  @idle_hours 48
+
+  @doc """
+  Finishes every game nobody has touched for two days, so the Games list
+  doesn't fill up with ones the family has wandered away from. Their last
+  board stays readable. Gives how many it finished.
+  """
+  def finish_idle(now \\ DateTime.utc_now(:second)) do
+    cutoff = DateTime.add(now, -@idle_hours * 3600)
+
+    Referee.run(fn ->
+      from(g in Game, where: g.status == "active" and g.updated_at < ^cutoff)
+      |> Repo.all()
+      |> Enum.map(fn game ->
+        game
+        |> Ecto.Changeset.change(
+          status: "finished",
+          state: Map.put(game.state, "ended", "idle"),
+          version: game.version + 1,
+          summary: "Put away after two days with no moves"
+        )
+        |> Repo.update!()
+        |> announce()
+      end)
+      |> length()
+    end)
+  end
+
   defp may_stop?(user, game),
     do: game.created_by_id == user.id or user.id in Map.values(game.seats) or Permissions.can?(user, :manage_people)
 

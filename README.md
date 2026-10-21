@@ -115,14 +115,14 @@ updates on every device at once.
 **Video calls.** Start one from any chat, and everyone else in it gets a
 ringing card with Join. Each person shows as an instant photo on a dark
 kitchen table, with mute, camera off, flip camera and floating reactions.
-Anyone can get the felt tips out and draw on anyone's picture, live, the way
-Bluey's family does on a video call: scribbles, moustaches, clown noses,
-crowns, with an Idea button for silly suggestions and Save a picture to keep
-it in the chat. Drawings stick to the person's face on every screen. There
-are games to play in the call too: Pull a Face (everyone's camera snaps the
-same silly face; give stars), Act It Out (charades with a timer) and Draw
-Together. The pictures and sound go straight between the devices; the server
-only introduces them. It suits up to about six people.
+Anyone can get the felt tips out and draw on anyone's picture, live:
+scribbles, moustaches, clown noses, crowns, with an Idea button for silly
+suggestions and Save a picture to keep it in the chat. Drawings stick to the
+person's face on every screen. There are games to play in the call too: Pull
+a Face (everyone's camera snaps the same silly face; give stars), Act It Out
+(charades with a timer) and Draw Together. The pictures and sound go straight
+between the devices; the server only introduces them. It suits up to about six
+people.
 
 **Games.** Started from any chat, played at everyone's own pace. A game waits
 for its next move as long as it needs to, and the app says when it's your
@@ -134,6 +134,17 @@ says why the move is good. Each tip shows a few times on a device and then
 stops, and How to play can switch them off. Pressing and holding a game in the
 Games list, or right-clicking it (or the bin in the game), takes it off your
 list; a game still going stops for everyone if you started it or play in it.
+A game nobody has touched for two days is put away as finished.
+
+Every game is set up for an age group: 5–7, 8–10, 11–13 or 14 and up. Younger
+groups get easier words and more clues (the picture in Word Garden, the
+finished photo beside the puzzle), gentler computer players and more tips;
+older ones get harder words, smaller puzzle pieces, a stronger computer and no
+tips. Learn mode, switched on in New game or How to play, teaches a game's
+basics a step at a time before playing, then explains as you go: the other
+side's chess and backgammon moves, a warning before a piece is left to be
+taken, letters read aloud, the shape of a story. It's remembered for each game
+on each device.
 
 | Game | How it's played |
 | --- | --- |
@@ -142,7 +153,7 @@ list; a game still going stops for everyone if you started it or play in it.
 | Picture Puzzle | A family photo cut into pieces; everyone swaps pieces back, or race on the same jumble (fewest swaps wins) |
 | Story Chain | Write a story one line each, then read it aloud; against each other, everyone stars their favourite lines |
 | Doodle Telephone | Words become a drawing, the drawing becomes a guess, and on |
-| Chess | Against a friendly computer (3 levels), as the whole family or just you, or each other |
+| Chess | Against a friendly computer (its strength set by age), as the whole family or just you, or each other |
 | Backgammon | The same: the computer, as the family or just you, or each other |
 | Doodle Battle | Everyone draws the same thing in secret, then gives stars |
 

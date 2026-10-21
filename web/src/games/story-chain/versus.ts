@@ -4,6 +4,7 @@
 // though never their own. The writer whose lines collect the most stars wins,
 // and the line with the most stars is the best line.
 import { leaders, listNames, nextSeat, placings } from '../common';
+import type { Band } from '../bands';
 
 export interface Line {
   u: number;
@@ -23,6 +24,7 @@ export interface StoryVersus {
   stars: Record<string, number[]>;
   /** People who have finished giving stars. */
   done: number[];
+  band?: Band;
 }
 
 export function newStory(starter: string, each: number, order: string[]): StoryVersus {

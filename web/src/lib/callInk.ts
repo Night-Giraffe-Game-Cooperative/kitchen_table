@@ -1,5 +1,5 @@
-// Drawing over the video in a call, the way Bluey's family draws on each
-// other over a video call: moustaches, crowns, silly glasses, scribbles.
+// Drawing over each other's pictures in a video call: moustaches, crowns,
+// silly glasses, scribbles.
 //
 // Everything drawn on someone's picture is kept in the coordinates of their
 // camera picture (0 to 1 across and down), not of the screen. Each device

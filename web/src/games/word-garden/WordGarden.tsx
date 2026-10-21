@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Avatar, Button, Field, Input, Segmented, Select } from '../../components/ui';
 import { canSpeak, speak } from '../../lib/speech';
 import type { Game } from '../../lib/types';
@@ -12,6 +12,7 @@ import {
   flowers,
   guessLetter,
   isOver,
+  livesFor,
   missesOf,
   newVersus,
   normalise,
@@ -23,6 +24,8 @@ import {
   type VersusState,
 } from './versus';
 import { categories, wordsFor, type Length } from './words';
+import type { Band } from '../bands';
+import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
 
 interface CoopState {
   turn: 'anyone';
@@ -32,7 +35,9 @@ interface CoopState {
   guessed: string[];
   by: Record<string, number>;
   lives: number;
-  length: Length;
+  /** Word size, in games from before age bands. */
+  length?: Length;
+  band?: Band;
   pick: string;
 }
 
@@ -41,15 +46,53 @@ type State = CoopState | VersusState;
 interface Options {
   mode: 'coop' | 'versus';
   category: string;
-  length: Length;
   players: PlayerSeat[];
   /** Words each player opens in versus. */
   rounds: number;
 }
 
 const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-const LIVES = 7;
+const VOWELS = 'aeiou';
 const FLOWERS = ['🌷', '🌻', '🌼', '🌸', '🌺'];
+
+/**
+ * When the picture clue shows: from the start for 5–7, after a couple of
+ * letters for 8–10, once half the word is found for 11–13, and only at the
+ * end for 14 and up.
+ */
+function pictureShown(band: Band, word: string, guessed: string[], done: boolean): boolean {
+  if (done || band === '5-7') return true;
+  const found = [...word].filter((ch) => guessed.includes(ch)).length;
+  if (band === '8-10') return word.length <= 4 || guessed.length >= 2;
+  if (band === '11-13') return found * 2 >= word.length;
+  return false;
+}
+
+const TIPS: Record<'start' | 'miss' | 'twice' | 'nearly', Tip> = {
+  start: { key: 'start', basic: true, text: 'Try a vowel first: A, E, I, O or U. Almost every word has at least one.' },
+  miss: { key: 'miss', basic: true, text: "Not in this word. E, T, A, O, N, S and R are the letters used most in English, so they're good next tries." },
+  twice: { key: 'twice', basic: true, text: 'That letter is in the word more than once, so it grew a flower in each gap.' },
+  nearly: { key: 'nearly', text: 'Nearly there! Say the word out loud with the gaps, and think what could fit.' },
+};
+
+/** The tip for what just happened on the board, if any. */
+function tipFor(word: string, guessed: string[]): Tip | null {
+  if (!guessed.length) return TIPS.start;
+  const latest = guessed[guessed.length - 1];
+  const hidden = new Set([...word].filter((ch) => !guessed.includes(ch)));
+  if (!word.includes(latest)) return TIPS.miss;
+  if ([...word].filter((ch) => ch === latest).length > 1) return TIPS.twice;
+  return hidden.size > 0 && hidden.size <= 2 && word.length >= 4 ? TIPS.nearly : null;
+}
+
+/** In learn mode, letters are read out as they're picked, and the word spelled out when it's found. */
+function sayLetter(learn: boolean, letter: string) {
+  if (learn && canSpeak) speak(letter.toUpperCase());
+}
+
+function spellOut(word: string) {
+  if (canSpeak) speak(`${[...word.toUpperCase()].join(', ')}. ${word}!`);
+}
 
 function solved(s: CoopState) {
   return [...s.word].every((ch) => s.guessed.includes(ch));
@@ -59,18 +102,20 @@ function misses(s: CoopState) {
   return s.guessed.filter((ch) => !s.word.includes(ch)).length;
 }
 
-function newState(o: { category: string; length: Length }, avoid?: string): CoopState {
-  const words = wordsFor(o.category, o.length).filter((w) => w.word !== avoid);
-  const w = pick(words.length ? words : wordsFor('mixed', 'any'));
+/** A new word to find together. For 5–7 the first letter is already in. */
+function newState(o: { category: string; band?: Band; length?: Length }, avoid?: string): CoopState {
+  const size = o.band ?? o.length ?? 'any';
+  const words = wordsFor(o.category, size).filter((w) => w.word !== avoid);
+  const w = pick(words.length ? words : wordsFor('mixed', size).filter((x) => x.word !== avoid));
   return {
     turn: 'anyone',
     word: w.word,
     emoji: w.emoji,
     category: w.category,
-    guessed: [],
+    guessed: o.band === '5-7' ? [w.word[0]] : [],
     by: {},
-    lives: LIVES,
-    length: o.length,
+    lives: livesFor(o.band),
+    ...(o.band ? { band: o.band } : { length: o.length ?? 'any' }),
     pick: o.category,
   };
 }
@@ -115,9 +160,27 @@ function Hint({ category, length, emoji, showArt }: { category: string; length: 
   );
 }
 
-function Keyboard({ word, guessed, enabled, onKey }: { word: string; guessed: string[]; enabled: boolean; onKey: (ch: string) => void }) {
+function Keyboard({
+  word,
+  guessed,
+  enabled,
+  vowels,
+  onKey,
+}: {
+  word: string;
+  guessed: string[];
+  enabled: boolean;
+  /** Learn mode shades the vowels. */
+  vowels: boolean;
+  onKey: (ch: string) => void;
+}) {
   return (
     <div className="keyboard" role="group" aria-label="Letters">
+      {vowels && (
+        <p className="keyboard-note muted">
+          <span className="key-sample" aria-hidden="true" /> Shaded letters are vowels: A, E, I, O and U.
+        </p>
+      )}
       {ROWS.map((row) => (
         <div key={row} className="keyboard-row">
           {[...row].map((ch) => {
@@ -129,9 +192,10 @@ function Keyboard({ word, guessed, enabled, onKey }: { word: string; guessed: st
                 type="button"
                 className="key"
                 data-state={used ? (good ? 'good' : 'miss') : undefined}
+                data-vowel={(vowels && VOWELS.includes(ch)) || undefined}
                 disabled={!enabled || used}
                 onClick={() => onKey(ch)}
-                aria-label={`${ch.toUpperCase()}${used ? (good ? ', found' : ', not in the word') : ''}`}
+                aria-label={`${ch.toUpperCase()}${vowels && VOWELS.includes(ch) ? ', a vowel' : ''}${used ? (good ? ', found' : ', not in the word') : ''}`}
               >
                 {ch.toUpperCase()}
               </button>
@@ -150,8 +214,23 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   const missed = misses(s);
   const canPlay = me.permissions.play_games && !done;
   const [again, setAgain] = useState(false);
+  const band = s.band ?? '8-10';
+  const learn = useLearn('word_garden');
+  const tips = useTips('word_garden', { band, learn });
+  const wasDone = useRef(done);
+  // The first letter given for 5–7 isn't anyone's guess.
+  const tried = s.guessed.filter((ch) => s.by[ch] !== undefined || !s.word.includes(ch));
+
+  useEffect(() => {
+    if (done) {
+      tips.dismiss();
+      if (learn && won && !wasDone.current) spellOut(s.word);
+    } else tips.offer(tipFor(s.word, tried.length ? s.guessed : []));
+    wasDone.current = done;
+  }, [s.guessed.length, done]);
 
   function guess(letter: string) {
+    sayLetter(learn, letter);
     play.move((st) => {
       if (st.guessed.includes(letter) || solved(st) || misses(st) >= st.lives) return null;
       const next = { ...st, guessed: [...st.guessed, letter], by: { ...st.by, [letter]: me.id } };
@@ -169,7 +248,7 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   return (
     <div className="wg">
       <Sky lives={s.lives} missed={missed} />
-      <Hint category={s.category} length={s.word.length} emoji={s.emoji} showArt={done || s.word.length <= 4 || s.guessed.length >= 2} />
+      <Hint category={s.category} length={s.word.length} emoji={s.emoji} showArt={pictureShown(band, s.word, s.guessed, done)} />
 
       <div className="wg-word" aria-live="polite">
         {[...s.word].map((ch, i) => {
@@ -202,7 +281,7 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
                   await startGame(game.room_id, 'word_garden', {
                     mode: 'coop',
                     seats: {},
-                    state: newState({ category: s.pick, length: s.length }, s.word),
+                    state: newState({ category: s.pick, band: s.band, length: s.length }, s.word),
                   });
                 } finally {
                   setAgain(false);
@@ -214,7 +293,10 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
           )}
         </div>
       ) : (
-        <Keyboard word={s.word} guessed={s.guessed} enabled={canPlay && !play.busy} onKey={guess} />
+        <>
+          <TipNote tip={tips.tip} onClose={tips.dismiss} />
+          <Keyboard word={s.word} guessed={s.guessed} enabled={canPlay && !play.busy} vowels={learn} onKey={guess} />
+        </>
       )}
     </div>
   );
@@ -258,8 +340,28 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
   const last = s.log[s.log.length - 1];
   const fresh = !over && s.guessed.length === 0 && s.wrong.length === 0;
   const previous = s.played[s.played.length - 1];
+  // Games from before age bands showed the picture once half the word was found.
+  const band = s.band ?? '11-13';
+  const learn = useLearn('word_garden');
+  const tips = useTips('word_garden', { band, learn });
+  const playedBefore = useRef(s.played.length);
+
+  useEffect(() => {
+    if (!myTurn) return void tips.dismiss();
+    // What someone else just tried isn't a tip for you, but how to start and how to finish are.
+    const t = tipFor(word, s.guessed);
+    const mineLast = last?.s === mine && last.w === s.at;
+    tips.offer(mineLast || t === TIPS.start || t === TIPS.nearly ? t : null);
+  }, [s.guessed.length, myTurn, s.at]);
+
+  // In learn mode, a word that has just been found is spelled out.
+  useEffect(() => {
+    if (learn && s.played.length > playedBefore.current && previous?.by) spellOut(previous.word);
+    playedBefore.current = s.played.length;
+  }, [s.played.length]);
 
   function guess(letter: string) {
+    sayLetter(learn, letter);
     play.move((st, g) => {
       const seat = seatOf(g.seats, me.id);
       const next = seat ? guessLetter(st, seatOrder(g.seats), seat, letter) : null;
@@ -292,8 +394,12 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
       const players = order.map((k) => game.seats[k]).filter((p): p is number => typeof p === 'number');
       const turned = [...players.slice(1), ...players.slice(0, 1)];
       const seats = playerSeats(turned);
-      const words = chooseWords(s.pick, s.length, s.words.length);
-      await startGame(game.room_id, 'word_garden', { mode: 'versus', seats, state: newVersus(words, seatOrder(seats), { length: s.length, pick: s.pick }) });
+      const words = chooseWords(s.pick, s.band ?? s.length ?? 'any', s.words.length);
+      await startGame(game.room_id, 'word_garden', {
+        mode: 'versus',
+        seats,
+        state: newVersus(words, seatOrder(seats), { band: s.band, length: s.length, pick: s.pick }),
+      });
     } finally {
       setAgain(false);
     }
@@ -377,8 +483,7 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
           )}
 
           <Sky lives={s.lives} missed={missed} />
-          {/* The picture would give the word away, so it only helps once half the letters are found. */}
-          <Hint category={now.category} length={word.length} emoji={now.emoji} showArt={[...word].filter((ch) => s.guessed.includes(ch)).length * 2 >= word.length} />
+          <Hint category={now.category} length={word.length} emoji={now.emoji} showArt={pictureShown(band, word, s.guessed, false)} />
 
           <div className="wg-word" aria-live="polite">
             {[...word].map((ch, i) => {
@@ -445,7 +550,8 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
             </form>
           ) : (
             <>
-              <Keyboard word={word} guessed={s.guessed} enabled={myTurn && !play.busy} onKey={guess} />
+              <TipNote tip={tips.tip} onClose={tips.dismiss} />
+              <Keyboard word={word} guessed={s.guessed} enabled={myTurn && !play.busy} vowels={learn} onKey={guess} />
               {myTurn && (
                 <Button variant="secondary" icon="sparkle" onClick={() => setSolving(true)}>
                   I know the word!
@@ -496,19 +602,6 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
           </Select>
         )}
       </Field>
-      <div className="field">
-        <span className="field-label">Word size</span>
-        <Segmented
-          label="Word size"
-          value={value.length}
-          onChange={(length) => onChange({ ...value, length })}
-          options={[
-            { value: 'short', label: 'Short' },
-            { value: 'any', label: 'Any' },
-            { value: 'long', label: 'Long' },
-          ]}
-        />
-      </div>
     </>
   );
 }
@@ -521,16 +614,23 @@ export const wordGarden: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or 2 to 4 taking turns',
-  defaults: ({ me, room, mode }) => ({ mode, category: 'mixed', length: 'short', players: defaultPlayers(room, me), rounds: 1 }),
+  defaults: ({ me, room, mode }) => ({ mode, category: 'mixed', players: defaultPlayers(room, me), rounds: 1 }),
   ready: (o) => o.mode !== 'versus' || o.players.length > 0,
   Options,
-  create: (o, { me, mode }) => {
-    if (mode !== 'versus') return { mode: 'coop', seats: {}, state: newState(o) };
+  create: (o, { me, mode, band }) => {
+    if (mode !== 'versus') return { mode: 'coop', seats: {}, state: newState({ category: o.category, band }) };
     const seats = playerSeats([me.id, ...o.players]);
     const order = seatOrder(seats);
-    const words = chooseWords(o.category, o.length, o.rounds * order.length);
-    return { mode, seats, state: newVersus(words, order, { length: o.length, pick: o.category }) };
+    const words = chooseWords(o.category, band, o.rounds * order.length);
+    return { mode, seats, state: newVersus(words, order, { band, pick: o.category }) };
   },
+  bands: {
+    '5-7': 'Short everyday words, the picture from the start, the first letter filled in and 9 suns.',
+    '8-10': 'Everyday words of four to six letters, the picture after a couple of letters and 8 suns.',
+    '11-13': 'Longer words, some harder, the picture once half the word is found and 7 suns.',
+    '14+': 'The hardest and longest words, only the clue and 6 suns.',
+  },
+  basics: wordGardenBasics(),
   Board,
   guide: [
     {
@@ -539,7 +639,7 @@ export const wordGarden: GameDef<State, Options> = {
     },
     {
       title: 'Together',
-      body: 'Anyone can pick the next letter. A right letter grows a flower in every gap where it belongs. A wrong one sends a sun behind a cloud. Find the word before all seven suns are gone.',
+      body: 'Anyone can pick the next letter. A right letter grows a flower in every gap where it belongs. A wrong one sends a sun behind a cloud. Find the word before all the suns are gone.',
     },
     {
       title: 'Against each other',
@@ -572,3 +672,13 @@ export const wordGarden: GameDef<State, Options> = {
     return `${found} of ${new Set(s.word).size} letters found · anyone can guess`;
   },
 };
+
+function wordGardenBasics(): Lesson[] {
+  return [
+    { art: '🌻', title: 'Find the hidden word', text: 'Each gap is one letter of a secret word. The clue above says what kind of thing it is, and the picture helps too.' },
+    { art: '🔤', title: 'Pick a letter', text: "Tap a letter. If it's in the word, it pops into every gap where it belongs and a flower grows there." },
+    { art: '☁️', title: 'Watch the suns', text: "A letter that isn't in the word sends a sun behind a cloud. Find the whole word before the suns run out." },
+    { art: '🅰️', title: 'Vowels first', text: "A, E, I, O and U are vowels. Almost every word has one, so they're good first tries. They're shaded on the keyboard." },
+    { art: '🗣️', title: 'Sound it out', text: 'Once a few letters are in, say the word out loud with the gaps. Letters are read out as you pick them.' },
+  ];
+}

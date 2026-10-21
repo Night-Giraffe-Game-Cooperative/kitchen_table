@@ -17,7 +17,7 @@ config :phoenix, :plug_init_mode, :runtime
 
 # Tests copy linked calendars when they ask to, not on a timer, and the fake
 # calendar server they talk to is on this machine.
-config :family, calendar_sync_ticks: false, calendar_private_hosts: true
+config :family, calendar_sync_ticks: false, game_tidy_ticks: false, calendar_private_hosts: true
 
 # Notifications go out as they happen rather than in the background, to a
 # fake push service on this machine.

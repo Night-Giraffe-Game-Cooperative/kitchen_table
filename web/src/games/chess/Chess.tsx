@@ -23,8 +23,9 @@ import {
   type Side,
 } from './rules';
 import { PieceIcon, pieceName } from './Pieces';
-import { HINT, TipNote, useTips } from '../learn';
-import { PROMOTE_TIP, chessGuide, endTip, explainMove, pieceTips, turnTips } from './learn';
+import { HINT, TipNote, useLearn, useTips } from '../learn';
+import { PROMOTE_TIP, chessBasics, chessGuide, endTip, explainMove, pieceTips, riskOf, theirMoveTip, turnTips } from './learn';
+import { bandOf, type Band } from '../bands';
 import { confirmFirst } from '../../components/confirm';
 
 type Seat = 'white' | 'black';
@@ -40,7 +41,6 @@ interface State {
 }
 
 interface Options {
-  level: Level;
   side: 'white' | 'black' | 'random';
   opponent: number | 'open';
   /** Against the computer: everyone in the chat as one team, or just the person starting it. */
@@ -49,7 +49,9 @@ interface Options {
 
 const seatOf = (s: Side): Seat => (s === 'w' ? 'white' : 'black');
 const sideOf = (s: Seat): Side => (s === 'white' ? 'w' : 'b');
-const levels: Record<Level, string> = { 1: 'Gentle', 2: 'Steady', 3: 'Tricky' };
+const levels: Record<Level, string> = { 1: 'Gentle', 2: 'Steady', 3: 'Tricky', 4: 'Strong' };
+/** How well the computer plays for each age band. */
+const levelFor: Record<Band, Level> = { '5-7': 1, '8-10': 2, '11-13': 3, '14+': 4 };
 
 /** Plays one move and reports whether that ended the game. */
 function play(state: State, move: Move): { state: State; over: ReturnType<typeof outcome> } {
@@ -106,15 +108,22 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
   const check = inCheck(shownPos) ? kingSquare(shownPos, shownPos.turn) : -1;
   const lost = captured(shownPos);
   const openSeat = (Object.keys(game.seats) as Seat[]).find((k) => game.seats[k] === 'open');
-  const tips = useTips('chess');
+  const band = bandOf(s);
+  const learn = useLearn('chess');
+  const tips = useTips('chess', { band, learn });
 
-  // At the start of each turn: check, and anything unusual the other side just did.
+  // At the start of each turn: check, and anything unusual the other side just did. In learn mode, whatever they did.
   useEffect(() => {
     if (done) return void tips.offer(endTip(s.ended));
     if (!myTurn) return;
     const before = s.history.length ? parseFen(s.history[s.history.length - 1]) : null;
-    tips.offer(...turnTips(pos, before, s.last, s.moves.length < 2));
-  }, [s.fen, myTurn, done]);
+    const theirs = learn && before && s.last ? movesFrom(before, s.last[0]).find((m) => m.to === s.last![1]) : undefined;
+    const who = game.seats[seatOf(before?.turn ?? 'w')];
+    tips.offer(
+      theirs && before ? theirMoveTip(before, theirs, who === 'computer' ? 'The computer' : nameOf(people, who)) : null,
+      ...turnTips(pos, before, s.last, s.moves.length < 2),
+    );
+  }, [s.fen, myTurn, done, learn]);
 
   // Picking up a piece explains how it moves, and any special move it has.
   useEffect(() => {
@@ -152,7 +161,7 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
     if (!ok) setSelected(null);
   }
 
-  function tap(square: number) {
+  async function tap(square: number) {
     if (!myTurn || actions.busy || preview) return;
     const piece = pos.board[square];
     if (selected !== null) {
@@ -161,7 +170,12 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
         tips.offer(PROMOTE_TIP);
         return setPromoting(options);
       }
-      if (options.length === 1) return void commit(options[0]);
+      if (options.length === 1) {
+        // Learn mode warns before leaving a piece where it can be taken.
+        const risk = learn ? riskOf(pos, options[0]) : null;
+        if (risk && !(await confirmFirst('Careful!', 'Move anyway', `${risk} Move it there anyway?`))) return;
+        return void commit(options[0]);
+      }
     }
     if (piece && piece.side === pos.turn) setSelected(square === selected ? null : square);
     else setSelected(null);
@@ -308,7 +322,7 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
 
       {!done && (
         <div className="row row-wrap game-actions">
-          {coop && myTurn && (
+          {coop && myTurn && (band !== '14+' || learn) && (
             <Button size="sm" icon="sparkle" onClick={giveHint}>
               Hint
             </Button>
@@ -348,28 +362,17 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
+function Options({ value, onChange, mode, band, room, me, people }: OptionsProps<Options>) {
   const others = room.member_ids.filter((id) => id !== me.id && people.get(id)?.active);
   return mode === 'coop' ? (
     <>
-      <WhoPlays value={value} onChange={onChange} />
-      <div className="field">
-        <span className="field-label">The computer plays</span>
-        <Segmented
-          label="The computer plays"
-          value={String(value.level)}
-          onChange={(v) => onChange({ ...value, level: Number(v) as Level })}
-          options={[
-            { value: '1', label: 'Gentle' },
-            { value: '2', label: 'Steady' },
-            { value: '3', label: 'Tricky' },
-          ]}
-        />
-        <p className="field-hint">
-          {value.who === 'team' ? "Anyone in the chat can make the family's move." : 'Only you make the moves, and the others can watch.'} Ask for a hint or
-          take a move back whenever you like.
-        </p>
-      </div>
+      <WhoPlays
+        value={value}
+        onChange={onChange}
+        hint={`${value.who === 'team' ? "Anyone in the chat can make the family's move." : 'Only you make the moves, and the others can watch.'} ${
+          band === '14+' ? 'Take a move back whenever you like.' : 'Ask for a hint or take a move back whenever you like.'
+        }`}
+      />
       <SidePicker value={value} onChange={onChange} label={value.who === 'team' ? 'The family plays' : 'You play'} />
     </>
   ) : (
@@ -391,7 +394,7 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
   );
 }
 
-function WhoPlays({ value, onChange }: { value: Options; onChange: (o: Options) => void }) {
+function WhoPlays({ value, onChange, hint }: { value: Options; onChange: (o: Options) => void; hint: string }) {
   return (
     <div className="field">
       <span className="field-label">Who plays the computer</span>
@@ -404,6 +407,7 @@ function WhoPlays({ value, onChange }: { value: Options; onChange: (o: Options) 
           { value: 'me', label: 'Just me', icon: 'me' },
         ]}
       />
+      <p className="field-hint">{hint}</p>
     </div>
   );
 }
@@ -439,16 +443,17 @@ export const chess: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 players',
-  defaults: () => ({ level: 1, side: 'white', opponent: 'open', who: 'team' }),
+  defaults: () => ({ side: 'white', opponent: 'open', who: 'team' }),
   Options,
-  create: (o, { me, mode }) => {
+  create: (o, { me, mode, band }) => {
     const side: Seat = o.side === 'random' ? (Math.random() < 0.5 ? 'white' : 'black') : o.side;
     const other: Seat = side === 'white' ? 'black' : 'white';
     if (mode === 'coop') {
-      let state = fresh(o.level);
+      const level = levelFor[band];
+      let state = fresh(level);
       if (side === 'black') {
         // The computer has white, so it opens.
-        const first = chooseMove(parseFen(START_FEN), o.level);
+        const first = chooseMove(parseFen(START_FEN), level);
         if (first) state = play(state, first).state;
       }
       const solo = o.who === 'me';
@@ -456,6 +461,13 @@ export const chess: GameDef<State, Options> = {
     }
     return { mode, seats: { [side]: me.id, [other]: o.opponent }, state: fresh() };
   },
+  bands: {
+    '5-7': 'A gentle computer that young children can beat, and tips about every piece.',
+    '8-10': 'A steady computer, and tips about every piece and the special rules.',
+    '11-13': 'A tricky computer, and tips only for the special rules, like castling.',
+    '14+': 'A strong computer that thinks further ahead, and no tips or hints.',
+  },
+  basics: chessBasics,
   Board,
   guide: chessGuide,
   status: (g, me, people) => {

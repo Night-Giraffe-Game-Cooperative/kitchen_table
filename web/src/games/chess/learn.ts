@@ -1,7 +1,7 @@
 // Chess explained as it's played: what the piece you picked up can do, the
 // special rules at the moment they come up, and why a hinted move is good.
 // Tips teach the idea and leave the choice to the player.
-import type { GuideSection, Tip } from '../learn';
+import type { GuideSection, Lesson, Tip } from '../learn';
 import { fileOf, inCheck, isAttacked, makeMove, movesFrom, outcome, squareName, type Kind, type Move, type Position, type Side } from './rules';
 
 export const KIND_NAMES: Record<Kind, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
@@ -40,7 +40,7 @@ export function pieceTips(pos: Position, square: number, targets: Move[]): Tip[]
     const without = { ...pos, board: pos.board.map((p, i) => (i === square ? null : p)) };
     if (piece.kind !== 'k' && inCheck(without, piece.side))
       return [{ key: 'piece:pinned', text: "This piece is pinned: it's standing between your king and an attacker, and moving it would leave the king in check." }];
-    return [{ key: 'piece:blocked', text: 'This piece has nowhere to go just now because its way is blocked. Moving other pieces can free it.' }];
+    return [{ key: 'piece:blocked', basic: true, text: 'This piece has nowhere to go just now because its way is blocked. Moving other pieces can free it.' }];
   }
 
   const tips: Tip[] = [];
@@ -54,10 +54,10 @@ export function pieceTips(pos: Position, square: number, targets: Move[]): Tip[]
       key: 'piece:en-passant',
       text: "En passant: their pawn just rushed two squares and landed beside yours. Just this once, you can take it as if it had only moved one, by stepping diagonally behind it.",
     });
-  tips.push({ key: `piece:${piece.kind}`, text: PIECES[piece.kind] });
+  tips.push({ key: `piece:${piece.kind}`, basic: true, text: PIECES[piece.kind] });
   if (targets.some((m) => pos.board[m.to]))
-    tips.push({ key: 'piece:capture', text: 'A ring means you can take the piece there. Before you do, look at whether one of theirs could take back.' });
-  tips.push({ key: 'piece:dots', text: 'Dots are the empty squares this piece can reach. Tap one to move, or tap a different piece of yours.' });
+    tips.push({ key: 'piece:capture', basic: true, text: 'A ring means you can take the piece there. Before you do, look at whether one of theirs could take back.' });
+  tips.push({ key: 'piece:dots', basic: true, text: 'Dots are the empty squares this piece can reach. Tap one to move, or tap a different piece of yours.' });
   return tips;
 }
 
@@ -83,6 +83,7 @@ export function turnTips(pos: Position, before: Position | null, last: [number, 
   if (firstMoves)
     tips.push({
       key: 'start',
+      basic: true,
       text: "Tap one of your pieces to see where it can go. The aim is checkmate: attacking the other king so that it can't escape.",
     });
   return tips;
@@ -165,6 +166,85 @@ export function explainMove(pos: Position, move: Move): string {
   }
   return [what, ...why.slice(0, 2)].join(' ');
 }
+
+/**
+ * Learn mode: what the other side's last move did, said plainly at the start
+ * of your turn. `who` is "The computer" or the other player's name.
+ */
+export function theirMoveTip(before: Position, move: Move, who: string): Tip {
+  const piece = before.board[move.from]!;
+  const after = makeMove(before, move);
+  const us = other(piece.side);
+  const parts = [
+    isCastle(before, move)
+      ? `${who} castled, tucking their king away.`
+      : `${who} moved their ${KIND_NAMES[piece.kind]} from ${squareName(move.from)} to ${squareName(move.to)}.`,
+  ];
+  const victim = before.board[move.to]?.kind ?? (isEnPassant(before, move) ? 'p' : null);
+  if (victim) parts.push(`It took your ${KIND_NAMES[victim]}.`);
+  if (move.promotion) parts.push(`Their pawn reached the end and became a ${KIND_NAMES[move.promotion]}.`);
+  if (inCheck(after)) parts.push('Your king is in check, so this move has to rescue him.');
+  else {
+    const target = biggestTarget(after, move.to, piece.side);
+    if (target && target.kind !== 'p' && !target.guarded) parts.push(`Watch out: it's attacking your ${KIND_NAMES[target.kind]}, and nothing guards it.`);
+    else if (target && VALUE[target.kind] > VALUE[piece.kind]) parts.push(`Watch out: it's attacking your ${KIND_NAMES[target.kind]}.`);
+    else if (piece.kind !== 'k' && isAttacked(after, move.to, us) && !isAttacked(after, move.to, piece.side))
+      parts.push('Could anything of yours take it? Nothing of theirs is guarding it.');
+  }
+  return { key: `their-move:${before.fullmove}${before.turn}`, text: parts.join(' ') };
+}
+
+/** The least valuable piece of `side` that could take on `square`. */
+function cheapestAttacker(pos: Position, square: number, side: Side): Kind | null {
+  let best: Kind | null = null;
+  const asThem = asTurn(pos, side);
+  for (let from = 0; from < 64; from++) {
+    const p = pos.board[from];
+    if (!p || p.side !== side) continue;
+    if (movesFrom(asThem, from).some((m) => m.to === square) && (best === null || VALUE[p.kind] < VALUE[best])) best = p.kind;
+  }
+  return best;
+}
+
+/**
+ * Learn mode: a warning before a move that leaves the piece where it can be
+ * taken for nothing, or by something worth less. Null when the move is fair.
+ */
+export function riskOf(pos: Position, move: Move): string | null {
+  const piece = pos.board[move.from];
+  if (!piece || piece.kind === 'k' || piece.kind === 'p') return null;
+  const after = makeMove(pos, move);
+  if (outcome(after)?.kind === 'checkmate') return null;
+  const them = other(piece.side);
+  const kind = move.promotion ?? piece.kind;
+  const cheapest = cheapestAttacker(after, move.to, them);
+  if (cheapest === null) return null;
+  const taken = pos.board[move.to]?.kind;
+  if (taken && VALUE[taken] >= VALUE[kind]) return null;
+  const guarded = isAttacked(after, move.to, piece.side);
+  if (guarded && VALUE[cheapest] >= VALUE[kind]) return null;
+  const name = KIND_NAMES[kind];
+  return guarded
+    ? `Their ${KIND_NAMES[cheapest]} could take your ${name} on ${squareName(move.to)}, and a ${KIND_NAMES[cheapest]} is worth less than a ${name}.`
+    : `Your ${name} could be taken on ${squareName(move.to)}, and nothing of yours guards that square.`;
+}
+
+export const chessBasics: Lesson[] = [
+  { art: '♟️', title: 'The aim', text: "Trap the other king so it can't escape. That's checkmate, and it wins the game. You take turns, one move each, and white goes first." },
+  { art: '👆', title: 'Moving', text: 'Tap one of your pieces to pick it up. Dots show where it can go and rings show pieces it can take. Tap one of them to move there.' },
+  {
+    art: '♞',
+    title: 'Every piece moves its own way',
+    text: 'Pawns step forward, knights jump in an L, bishops go diagonally, rooks go straight, the queen goes any way and the king one step. Pick a piece up and a note says how it moves.',
+  },
+  {
+    art: '⚔️',
+    title: 'Taking pieces',
+    text: "Move onto one of their pieces to take it. Before you move, think whether they could take yours back. In learn mode you're warned when a move puts a piece in danger.",
+  },
+  { art: '👑', title: 'Check', text: "When a king is attacked, that's check. Its player has to rescue it straight away: move the king, block the attack, or take the attacker." },
+  { art: '🤖', title: 'Watching the other side', text: "At the start of your turn, a note says what the other side just did and what it might be after. Ask for a hint whenever you're stuck." },
+];
 
 export const chessGuide: GuideSection[] = [
   {

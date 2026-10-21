@@ -7,8 +7,9 @@ import { DoodleBoard, defaultTool, type Tool } from '../../components/DoodleBoar
 import { DoodleTools } from '../../components/DoodleTools';
 import { Avatar, Button } from '../../components/ui';
 import type { GameDef, GameProps, OptionsProps } from '../common';
-import { doodlePrompts, listNames, nameOf, pick } from '../common';
+import { listNames, nameOf, pick } from '../common';
 import { PromptField } from './PromptOptions';
+import { doodleBands, isPrompt, promptsFor, togetherBasics } from './prompts';
 
 interface State {
   turn: 'anyone';
@@ -107,8 +108,8 @@ function Board({ game, play, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange }: OptionsProps<{ prompt: string }>) {
-  return <PromptField value={value.prompt} onChange={(prompt) => onChange({ prompt })} />;
+function Options({ value, onChange, band }: OptionsProps<{ prompt: string }>) {
+  return <PromptField value={value.prompt} band={band} onChange={(prompt) => onChange({ prompt })} />;
 }
 
 export const doodleTogether: GameDef<State, { prompt: string }> = {
@@ -118,7 +119,10 @@ export const doodleTogether: GameDef<State, { prompt: string }> = {
   blurb: "One big page that everyone draws on at the same time, live. Share it in the chat when it's done.",
   modes: ['coop'],
   players: 'Any number',
-  defaults: () => ({ prompt: pick(doodlePrompts) }),
+  defaults: ({ band }) => ({ prompt: pick(promptsFor[band]) }),
+  rebanded: (o, band) => (isPrompt(o.prompt) ? { prompt: pick(promptsFor[band]) } : o),
+  bands: doodleBands,
+  basics: togetherBasics,
   ready: (o) => o.prompt.trim().length > 0,
   Options,
   create: (o) => ({ mode: 'coop', seats: {}, state: { turn: 'anyone', prompt: o.prompt.trim(), strokes: [], page: PAGE } }),

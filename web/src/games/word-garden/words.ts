@@ -1,10 +1,15 @@
-// Words for Word Garden, with a picture to help younger readers. Kept to
-// words a five-year-old might know, in British spelling.
+// Words for Word Garden, with a picture to help younger readers, in British
+// spelling. Most are words a five-year-old might know; the ones marked hard
+// are for older players, from 11 up.
+import type { Band } from '../bands';
 
 export interface Word {
   word: string;
   emoji: string;
+  hard?: boolean;
 }
+
+const hard = (list: [string, string][]): Word[] => list.map(([word, emoji]) => ({ word, emoji, hard: true }));
 
 export const categories: Record<string, { label: string; hint: string; words: Word[] }> = {
   animals: {
@@ -41,6 +46,12 @@ export const categories: Record<string, { label: string; hint: string; words: Wo
       { word: 'butterfly', emoji: '🦋' },
       { word: 'crocodile', emoji: '🐊' },
       { word: 'unicorn', emoji: '🦄' },
+      ...hard([
+        ['lizard', '🦎'], ['octopus', '🐙'], ['squirrel', '🐿️'], ['hamster', '🐹'], ['peacock', '🦚'], ['gorilla', '🦍'],
+        ['leopard', '🐆'], ['scorpion', '🦂'], ['mosquito', '🦟'], ['kangaroo', '🦘'], ['flamingo', '🦩'], ['raccoon', '🦝'],
+        ['lobster', '🦞'], ['ladybird', '🐞'], ['caterpillar', '🐛'], ['orangutan', '🦧'], ['rhinoceros', '🦏'], ['hippopotamus', '🦛'],
+        ['badger', '🦡'], ['otter', '🦦'], ['sloth', '🦥'], ['beaver', '🦫'], ['mammoth', '🦣'], ['tarantula', '🕷️'],
+      ]),
     ],
   },
   food: {
@@ -72,6 +83,12 @@ export const categories: Record<string, { label: string; hint: string; words: Wo
       { word: 'strawberry', emoji: '🍓' },
       { word: 'spaghetti', emoji: '🍝' },
       { word: 'doughnut', emoji: '🍩' },
+      ...hard([
+        ['avocado', '🥑'], ['cucumber', '🥒'], ['aubergine', '🍆'], ['pretzel', '🥨'], ['croissant', '🥐'], ['sweetcorn', '🌽'],
+        ['coconut', '🥥'], ['mango', '🥭'], ['waffle', '🧇'], ['dumpling', '🥟'], ['burrito', '🌯'], ['noodles', '🍜'],
+        ['blueberry', '🫐'], ['watermelon', '🍉'], ['tangerine', '🍊'], ['chocolate', '🍫'], ['lollipop', '🍭'], ['omelette', '🍳'],
+        ['baguette', '🥖'], ['peanut', '🥜'], ['garlic', '🧄'], ['onion', '🧅'], ['sausage', '🌭'], ['kiwifruit', '🥝'],
+      ]),
     ],
   },
   home: {
@@ -100,6 +117,12 @@ export const categories: Record<string, { label: string; hint: string; words: Wo
       { word: 'umbrella', emoji: '☂️' },
       { word: 'toothbrush', emoji: '🪥' },
       { word: 'television', emoji: '📺' },
+      ...hard([
+        ['candle', '🕯️'], ['basket', '🧺'], ['bucket', '🪣'], ['ladder', '🪜'], ['hammer', '🔨'], ['sponge', '🧽'],
+        ['telephone', '☎️'], ['computer', '💻'], ['keyboard', '⌨️'], ['calendar', '📅'], ['thermometer', '🌡️'], ['magnet', '🧲'],
+        ['battery', '🔋'], ['envelope', '✉️'], ['paintbrush', '🖌️'], ['microscope', '🔬'], ['telescope', '🔭'], ['headphones', '🎧'],
+        ['guitar', '🎸'], ['trumpet', '🎺'], ['violin', '🎻'], ['saxophone', '🎷'], ['broom', '🧹'], ['compass', '🧭'],
+      ]),
     ],
   },
   outside: {
@@ -128,6 +151,12 @@ export const categories: Record<string, { label: string; hint: string; words: Wo
       { word: 'sunflower', emoji: '🌻' },
       { word: 'mushroom', emoji: '🍄' },
       { word: 'acorn', emoji: '🌰' },
+      ...hard([
+        ['volcano', '🌋'], ['desert', '🏜️'], ['island', '🏝️'], ['lightning', '🌩️'], ['tornado', '🌪️'], ['cactus', '🌵'],
+        ['tulip', '🌷'], ['hibiscus', '🌺'], ['seedling', '🌱'], ['comet', '☄️'], ['planet', '🪐'], ['galaxy', '🌌'],
+        ['thunder', '⛈️'], ['fountain', '⛲'], ['bonfire', '🔥'], ['castle', '🏰'], ['evergreen', '🌲'], ['snowflake', '❄️'],
+        ['iceberg', '🧊'], ['meadow', '🌼'], ['sunrise', '🌅'], ['moonlight', '🌕'], ['blossom', '🌸'], ['horizon', '🌄'],
+      ]),
     ],
   },
   moving: {
@@ -151,17 +180,48 @@ export const categories: Record<string, { label: string; hint: string; words: Wo
       { word: 'helicopter', emoji: '🚁' },
       { word: 'skateboard', emoji: '🛹' },
       { word: 'firetruck', emoji: '🚒' },
+      ...hard([
+        ['ambulance', '🚑'], ['motorbike', '🏍️'], ['bicycle', '🚲'], ['aeroplane', '✈️'], ['canoe', '🛶'], ['parachute', '🪂'],
+        ['tram', '🚊'], ['taxi', '🚕'], ['speedboat', '🚤'], ['ferry', '⛴️'], ['satellite', '🛰️'], ['rollerskate', '🛼'],
+        ['locomotive', '🚂'], ['monorail', '🚝'], ['sledge', '🛷'], ['minibus', '🚐'], ['lorry', '🚚'], ['gondola', '🚡'],
+        ['trolleybus', '🚎'], ['spaceship', '🚀'], ['sailboat', '⛵'], ['wheelchair', '🦽'], ['funicular', '🚞'], ['rickshaw', '🛺'],
+      ]),
     ],
   },
 };
 
+/** Word sizes, from games made before age bands. */
 export type Length = 'short' | 'any' | 'long';
 
-export function wordsFor(category: string, length: Length): (Word & { category: string })[] {
-  const cats = category === 'mixed' ? Object.keys(categories) : [category];
-  return cats.flatMap((c) =>
-    categories[c].words
-      .filter((w) => (length === 'short' ? w.word.length <= 5 : length === 'long' ? w.word.length >= 6 : true))
-      .map((w) => ({ ...w, category: c })),
-  );
+/**
+ * Whether a word suits an age band: short everyday words for 5–7, everyday
+ * words of four to six letters for 8–10, longer ones and some harder ones for
+ * 11–13, and the harder and longest ones for 14 and up.
+ */
+export function fits(w: Word, band: Band): boolean {
+  const n = w.word.length;
+  switch (band) {
+    case '5-7':
+      return !w.hard && n <= 4;
+    case '8-10':
+      return !w.hard && n >= 4 && n <= 6;
+    case '11-13':
+      return n >= 6 && n <= 9;
+    case '14+':
+      return w.hard ? n >= 6 : n >= 9;
+  }
+}
+
+/** The words of a category (or 'mixed' for all of them) for an age band, or a word size from an older game. */
+export function wordsFor(category: string, size: Band | Length): (Word & { category: string })[] {
+  const cats = category === 'mixed' || !categories[category] ? Object.keys(categories) : [category];
+  const keep = (w: Word) =>
+    size === 'short'
+      ? !w.hard && w.word.length <= 5
+      : size === 'long'
+        ? !w.hard && w.word.length >= 6
+        : size === 'any'
+          ? !w.hard
+          : fits(w, size);
+  return cats.flatMap((c) => categories[c].words.filter(keep).map((w) => ({ ...w, category: c })));
 }

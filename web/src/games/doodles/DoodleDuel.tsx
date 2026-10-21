@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Avatar, Button } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import type { GameDef, GameProps, OptionsProps } from '../common';
-import { doodlePrompts, listNames, nameOf, pick } from '../common';
+import { listNames, nameOf, pick } from '../common';
 import { DrawPad } from './DrawPad';
 import { PromptField } from './PromptOptions';
+import { doodleBands, duelBasics, isPrompt, promptsFor } from './prompts';
 
 interface State {
   turn: 'anyone';
@@ -145,8 +146,8 @@ function Board({ game, play, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange }: OptionsProps<{ prompt: string }>) {
-  return <PromptField value={value.prompt} onChange={(prompt) => onChange({ prompt })} />;
+function Options({ value, onChange, band }: OptionsProps<{ prompt: string }>) {
+  return <PromptField value={value.prompt} band={band} onChange={(prompt) => onChange({ prompt })} />;
 }
 
 export const doodleDuel: GameDef<State, { prompt: string }> = {
@@ -157,7 +158,10 @@ export const doodleDuel: GameDef<State, { prompt: string }> = {
   modes: ['versus'],
   modeLabels: { versus: 'Everyone draws' },
   players: '2 or more',
-  defaults: () => ({ prompt: pick(doodlePrompts) }),
+  defaults: ({ band }) => ({ prompt: pick(promptsFor[band]) }),
+  rebanded: (o, band) => (isPrompt(o.prompt) ? { prompt: pick(promptsFor[band]) } : o),
+  bands: doodleBands,
+  basics: duelBasics,
   ready: (o) => o.prompt.trim().length > 0,
   Options,
   create: (o, { room, people }) => ({

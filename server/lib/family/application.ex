@@ -15,6 +15,7 @@ defmodule Family.Application do
       Family.RateLimit,
       {Task.Supervisor, name: Family.TaskSupervisor},
       Family.Games.Referee,
+      Family.Games.Tidy,
       Family.Calls,
       Family.Calendar.Links.Sync,
       FamilyWeb.Presence,

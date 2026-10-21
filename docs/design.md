@@ -182,8 +182,8 @@ with a certificate it makes for itself, covering the PC's own addresses. Each
 device clicks past one warning the first time. The plain address stays for
 anything that doesn't need the camera.
 
-**19 Oct 2026. Drawing over the call, Bluey style.** The idea of "facey
-time" here is the Bluey kind, where the family draws on each other over the video.
+**19 Oct 2026. Drawing over the call.** The idea of "facey time" here is
+the family drawing on each other over the video.
 Anyone can draw on anyone's picture. Drawings are kept in the coordinates of
 the person's camera picture (0 to 1 across and down), not the screen, so a
 moustache stays under the same nose on a phone, a tablet and a PC, even
@@ -372,3 +372,16 @@ grown-ups who say yes aren't always parents.
 right-clicking it, takes it off that person's list. A game still going stops
 for everyone when the person started it, plays in it, or is an admin;
 otherwise it carries on for the others. It stays in the chat either way.
+
+**21 Oct 2026. Age groups, learn mode, and putting idle games away.** Every
+game is set up for 5–7, 8–10, 11–13 or 14 and up, chosen in New game and kept
+in the game, so everyone playing sees the same game. The age group replaces
+the separate word size, computer strength and puzzle size settings, since
+they all answer the same question. Younger groups get more clues and tips;
+14 and up gets the hardest version with no tips. Learn mode is separate from
+the age group because a grown-up new to backgammon needs the basics as much
+as a child does: it's switched on per game on one device, shows the basics
+before playing, and every tip every game. The device remembers the last age
+group chosen; children start on 5–7 and grown-ups on 8–10. A game nobody has
+moved in for two days is put away as finished by the server once an hour, so
+the Games list doesn't fill with games everyone has forgotten.

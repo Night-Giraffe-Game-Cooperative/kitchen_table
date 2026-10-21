@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Avatar, Button, Field, Input, Segmented } from '../../components/ui';
 import type { GameDef, GameProps, OptionsProps } from '../common';
-import { doodlePrompts, listNames, nameOf, pick } from '../common';
+import { listNames, nameOf, pick } from '../common';
 import { DrawPad } from './DrawPad';
 import { PromptField } from './PromptOptions';
+import { doodleBands, isPrompt, promptsFor, telephoneBasics } from './prompts';
 
 interface Step {
   kind: 'words' | 'picture';
@@ -114,10 +115,10 @@ function Board({ game, play, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange }: OptionsProps<Options>) {
+function Options({ value, onChange, band }: OptionsProps<Options>) {
   return (
     <>
-      <PromptField label="The first words" value={value.prompt} onChange={(prompt) => onChange({ ...value, prompt })} />
+      <PromptField label="The first words" value={value.prompt} band={band} onChange={(prompt) => onChange({ ...value, prompt })} />
       <div className="field">
         <span className="field-label">Steps</span>
         <Segmented
@@ -142,7 +143,10 @@ export const doodleTelephone: GameDef<State, Options> = {
   blurb: 'Words become a drawing, the drawing becomes a guess, and on it goes. See how far it travels.',
   modes: ['coop'],
   players: '2 or more, taking turns',
-  defaults: () => ({ prompt: pick(doodlePrompts), length: 7 }),
+  defaults: ({ band }) => ({ prompt: pick(promptsFor[band]), length: 7 }),
+  rebanded: (o, band) => (isPrompt(o.prompt) ? { ...o, prompt: pick(promptsFor[band]) } : o),
+  bands: doodleBands,
+  basics: telephoneBasics,
   ready: (o) => o.prompt.trim().length > 0,
   Options,
   create: (o, { me }) => ({

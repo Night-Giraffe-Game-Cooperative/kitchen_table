@@ -9,7 +9,8 @@ import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Notice, Segmente
 import { Icon } from '../components/icons';
 import { gameDefs, gameDef, gameStatusLine, isMyTurn } from '../games/registry';
 import { useGame } from '../games/useGame';
-import { HowToPlay } from '../games/learn';
+import { Basics, HowToPlay, LearnToggle, useLearn } from '../games/learn';
+import { BANDS, bandLabel, defaultBand, rememberBand, type Band } from '../games/bands';
 import { confirmFirst } from '../components/confirm';
 import { useLongPress } from '../components/longPress';
 import type { GameDef, Mode } from '../games/common';
@@ -159,6 +160,7 @@ function GameView({ id }: { id: number }) {
   const def = game ? gameDef(game.type) : undefined;
   const room = game ? rooms.find((r) => r.id === game.room_id) : undefined;
   const [learning, setLearning] = useState(false);
+  const learn = useLearn(game?.type ?? '');
 
   return (
     <div className="game-view">
@@ -192,7 +194,15 @@ function GameView({ id }: { id: number }) {
         {def?.guide && (
           <>
             <IconButton icon="book" label="How to play" onClick={() => setLearning(true)} />
-            <HowToPlay name={def.name} emoji={def.emoji} guide={def.guide} open={learning} onClose={() => setLearning(false)} />
+            <HowToPlay
+              game={def.type}
+              name={def.name}
+              emoji={def.emoji}
+              guide={def.guide}
+              learns={!!def.basics}
+              open={learning}
+              onClose={() => setLearning(false)}
+            />
           </>
         )}
         {game && (
@@ -208,6 +218,7 @@ function GameView({ id }: { id: number }) {
       <div className="game-body">
         {error && <Notice tone="danger">{error}</Notice>}
         {!game && !error && <Spinner label="Loading the game" />}
+        {game && def?.basics && learn && game.status === 'active' && <Basics game={def.type} gameId={game.id} lessons={def.basics} />}
         {game && def && <def.Board game={game} play={play} me={me} people={people} room={room} />}
         {game && !def && <Notice tone="warning">This game needs a newer version of the app. Try reloading.</Notice>}
       </div>
@@ -221,7 +232,9 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
   const [mode, setMode] = useState<Mode>('coop');
   const [room, setRoom] = useState<number | undefined>(roomId);
   const [options, setOptions] = useState<unknown>(null);
+  const [band, setBand] = useState<Band>(() => defaultBand(me));
   const [busy, setBusy] = useState(false);
+  const learn = useLearn(def?.type ?? '');
 
   const playable = rooms.filter((r) => r.member && !r.closed);
   const target = playable.find((r) => r.id === (room ?? roomId)) ?? playable[0];
@@ -231,15 +244,20 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
       setDef(null);
       setBusy(false);
       setRoom(roomId);
-    }
+    } else setBand(defaultBand(me));
   }, [open, roomId]);
 
   const defaults = useMemo(
-    () => (def && target ? def.defaults({ me, room: target, mode }) : null),
-    // Fresh options when the game, mode or room changes.
+    () => (def && target ? def.defaults({ me, room: target, mode, band }) : null),
+    // Fresh options when the game, mode or room changes; a new band only adjusts them.
     [def, mode, target?.id],
   );
   useEffect(() => setOptions(defaults), [defaults]);
+
+  function chooseBand(b: Band) {
+    setBand(b);
+    if (def?.rebanded && options != null) setOptions(def.rebanded(options, b));
+  }
 
   function choose(d: GameDef) {
     setDef(d);
@@ -250,8 +268,14 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
     if (!def || !target) return;
     setBusy(true);
     try {
-      const made = await def.create(options, { me, room: target, mode, people });
-      const res = await api.post<{ game: Game }>(`/api/rooms/${target.id}/games`, { type: def.type, ...made, mode: made.mode ?? mode });
+      const made = await def.create(options, { me, room: target, mode, band, people });
+      rememberBand(band);
+      const res = await api.post<{ game: Game }>(`/api/rooms/${target.id}/games`, {
+        type: def.type,
+        ...made,
+        mode: made.mode ?? mode,
+        state: { ...(made.state as object), band },
+      });
       await refreshGames();
       onClose();
       go({ name: 'games', gameId: res.game.id });
@@ -332,9 +356,15 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
               />
             </div>
           )}
+          <div className="field">
+            <span className="field-label">Ages</span>
+            <Segmented label="Ages" value={band} onChange={chooseBand} options={BANDS.map((b) => ({ value: b, label: bandLabel[b] }))} />
+            <p className="field-hint">{def.bands[band]}</p>
+          </div>
           {def.Options && options != null && target && (
-            <def.Options value={options} onChange={setOptions} mode={mode} room={target} me={me} people={people} />
+            <def.Options value={options} onChange={setOptions} mode={mode} band={band} room={target} me={me} people={people} />
           )}
+          {def.basics && <LearnToggle game={def.type} checked={learn} />}
         </div>
       )}
     </Dialog>

@@ -2605,6 +2605,27 @@ button {
   opacity: 0.6;
 }
 
+/* Learn mode shades the vowels. */
+.key[data-vowel]:not([data-state]) {
+  background: var(--warning-soft);
+}
+
+.keyboard-note {
+  margin: 0 0 0.2rem;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.key-sample {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+  border: 1px solid var(--edge);
+  border-radius: 0.2em;
+  background: var(--warning-soft);
+}
+
 /* Picture Puzzle */
 
 .pp {
@@ -2617,6 +2638,11 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+}
+
+.pp-bar .muted {
+  flex: 1;
 }
 
 .pp-frame {
@@ -2655,6 +2681,34 @@ button {
 .pp-tile[data-right] {
   box-shadow: none;
   cursor: default;
+}
+
+/* Where the picked-up piece belongs, for the youngest and in learn mode. */
+.pp-tile[data-home] {
+  box-shadow: inset 0 0 0 4px var(--success), inset 0 0 0 9999px rgb(255 255 255 / 0.25);
+  animation: pp-home 1.2s var(--ease) infinite alternate;
+}
+
+@keyframes pp-home {
+  to {
+    box-shadow: inset 0 0 0 4px var(--success), inset 0 0 0 9999px rgb(255 255 255 / 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-tile[data-home] {
+    animation: none;
+  }
+}
+
+.pp-guide {
+  width: 3.5rem;
+  max-height: 3.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--surface);
+  box-shadow: var(--shadow-lift);
+  flex: none;
 }
 
 .pp-tile:disabled {
@@ -2770,6 +2824,74 @@ button {
   text-align: center;
   font-weight: 800;
   letter-spacing: 0.1em;
+}
+
+/* Story Chain help: words to start a line with, the Idea button, and learn mode's story shape. */
+.story-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.story-openers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.story-opener {
+  min-height: 2.5rem;
+  padding: 0.3rem 0.85rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.story-opener:hover {
+  background: var(--sunken);
+}
+
+.story-shape {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story-shape li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.story-shape li[aria-current] {
+  background: var(--warning-soft);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--edge);
+}
+
+@media (max-width: 30rem) {
+  .story-shape {
+    grid-template-columns: 1fr;
+  }
+
+  .story-shape li:not([aria-current]) {
+    display: none;
+  }
 }
 
 .story-tools {
@@ -3110,6 +3232,57 @@ button {
   .tip-note {
     animation: none;
   }
+}
+
+/* Learn mode: the basics a step at a time, then a reminder it's on. */
+.basics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  padding: 0.85rem 1rem;
+  background-color: var(--info-soft);
+  border-radius: var(--radius-md);
+}
+
+.basics-step {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.basics-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.basics-art {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.basics h2 {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-base);
+}
+
+.basics p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.basics-actions {
+  justify-content: flex-end;
+}
+
+.learn-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.6rem;
+  font-size: var(--text-sm);
 }
 
 .guide-section + .guide-section {

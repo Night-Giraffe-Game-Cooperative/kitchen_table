@@ -3,10 +3,12 @@ import { api } from '../../lib/api';
 import { confirmFirst } from '../../components/confirm';
 import { preparePhoto, upload } from '../../lib/image';
 import type { Game, Media, Message } from '../../lib/types';
-import { Button, Segmented, Spinner } from '../../components/ui';
+import { Button, Spinner } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, playerSeats, seatOf, seatOrder, startGame } from '../common';
+import { bandOf, type Band } from '../bands';
+import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
 import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers, winnerText, type Standing } from '../word-garden/Players';
 import {
   begin,
@@ -30,16 +32,65 @@ interface CoopState {
   tiles: number[]; // tiles[place] = which piece of the picture sits there
   moves: number;
   by: Record<string, number>;
+  band?: Band;
 }
 
 type State = CoopState | RaceState;
 
 interface Options {
   mode: 'coop' | 'versus';
-  size: number;
   media: Media | null;
   file: File | null;
   players: PlayerSeat[];
+}
+
+/** Pieces along each side, by age: 9 big pieces for the youngest up to 36 small ones. */
+const sizeFor: Record<Band, number> = { '5-7': 3, '8-10': 4, '11-13': 5, '14+': 6 };
+
+/**
+ * The clues a puzzle gives. The youngest see the finished picture all the
+ * time and the right space lights up when they pick up a piece; 14 and up
+ * get no peeking. Learn mode shows the picture and allows a peek at any age,
+ * and lights up the right space when puzzling together.
+ */
+function cluesFor(band: Band, learn: boolean, race: boolean) {
+  return {
+    guide: band === '5-7' || learn,
+    home: band === '5-7' || (learn && !race),
+    peek: band !== '14+' || learn,
+  };
+}
+
+const TIPS = {
+  start: { key: 'start', basic: true, text: 'Tap a piece to pick it up, then tap the space where it belongs. The two pieces swap places.' },
+  placed: { key: 'placed', basic: true, text: 'That piece is in its right place, so it stays put. Pieces in place lose their outline.' },
+  corners: { key: 'corners', text: 'Look for the corners and edges first. Sky usually goes along the top and the ground along the bottom.' },
+  landmarks: { key: 'landmarks', text: 'Faces and bright colours make good landmarks. Find where they go, then fill in around them.' },
+  peek: { key: 'peek', text: 'Stuck? Peek shows the whole picture until you hide it again.' },
+  fewest: { key: 'fewest', text: 'To keep your swaps low, put every piece you move straight into its right place.' },
+} satisfies Record<string, Tip>;
+
+/** Tips as the puzzle goes: how to swap, pieces locking in, where to look. */
+function usePuzzleTips(band: Band, learn: boolean, tiles: number[] | null, swaps: number, { race, peek }: { race: boolean; peek: boolean }) {
+  const tips = useTips('picture_puzzle', { band, learn });
+  const placed = tiles ? tiles.filter((p, i) => p === i).length : 0;
+  const before = useRef(placed);
+  useEffect(() => {
+    const was = before.current;
+    before.current = placed;
+    if (!tiles) return;
+    if (isSolved(tiles)) return void tips.dismiss();
+    if (swaps === 0) return void tips.offer(TIPS.start, race ? TIPS.fewest : null);
+    if (placed > was) return void tips.offer(TIPS.placed, swaps >= 4 ? TIPS.landmarks : null);
+    tips.offer(swaps >= 2 ? TIPS.corners : null, swaps >= 8 && peek && placed * 3 < tiles.length ? TIPS.peek : null);
+    // Once a swap.
+  }, [swaps, !tiles, tips.offer]);
+  return tips;
+}
+
+/** The finished picture, small, beside the puzzle: the youngest always have it. */
+function GuidePicture({ media }: { media: CoopState['media'] }) {
+  return <img className="pp-guide" src={media.url} alt="The finished picture, to copy" />;
 }
 
 function Board(props: GameProps<State>) {
@@ -59,6 +110,7 @@ function Grid({
   locked,
   done,
   peek,
+  home,
   onTap,
 }: {
   media: CoopState['media'];
@@ -68,8 +120,11 @@ function Grid({
   locked: boolean;
   done: boolean;
   peek: boolean;
+  /** Light up the space the picked-up piece belongs in. */
+  home: boolean;
   onTap: (place: number) => void;
 }) {
+  const goes = home && held !== null ? tiles[held] : null;
   return (
     <div className="pp-frame">
       <div
@@ -90,8 +145,9 @@ function Grid({
               className="pp-tile"
               data-held={held === place || undefined}
               data-right={right || undefined}
+              data-home={(goes === place && held !== place) || undefined}
               disabled={locked || right}
-              aria-label={`Piece ${piece + 1} at space ${place + 1}${right ? ', in place' : ''}${held === place ? ', picked up' : ''}`}
+              aria-label={`Piece ${piece + 1} at space ${place + 1}${right ? ', in place' : ''}${held === place ? ', picked up' : ''}${goes === place && held !== place ? ', where it goes' : ''}`}
               onClick={() => onTap(place)}
               style={{
                 backgroundImage: `url(${media.url})`,
@@ -127,6 +183,11 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   const done = game.status === 'finished';
   const canPlay = me.permissions.play_games && !done;
   const placed = s.tiles.filter((p, i) => p === i).length;
+  const band = bandOf(s);
+  const learn = useLearn('picture_puzzle');
+  const clues = cluesFor(band, learn, false);
+  const tips = usePuzzleTips(band, learn, s.tiles, s.moves, { race: false, peek: clues.peek });
+  const smaller = Math.min(6, s.size + 1);
 
   const { held, tap } = useHeld((a, place) =>
     play.move((st) => {
@@ -146,15 +207,17 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   return (
     <div className="pp">
       <div className="pp-bar">
+        {clues.guide && !done && <GuidePicture media={s.media} />}
         <span className="muted">
           {done ? `Finished in ${s.moves} swaps` : `${placed} of ${s.tiles.length} pieces in place · ${s.moves} swaps`}
         </span>
-        {!done && (
+        {!done && clues.peek && (
           <Button size="sm" variant="ghost" icon="eye" onClick={() => setPeek(!peek)}>
             {peek ? 'Hide picture' : 'Peek'}
           </Button>
         )}
       </div>
+      {!done && <TipNote tip={tips.tip} onClose={tips.dismiss} />}
       <Grid
         media={s.media}
         size={s.size}
@@ -162,7 +225,8 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
         held={held}
         locked={!canPlay || play.busy}
         done={done}
-        peek={peek}
+        peek={peek && clues.peek}
+        home={clues.home}
         onTap={(place) => canPlay && s.tiles[place] !== place && tap(place)}
       />
       {!done && <p className="muted center">{held === null ? 'Tap a piece, then tap where it should go.' : 'Now tap where it should go.'}</p>}
@@ -178,18 +242,17 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
               onClick={async () => {
                 setAgain(true);
                 try {
-                  const size = Math.min(6, s.size + 1);
                   await startGame(game.room_id, 'picture_puzzle', {
                     mode: 'coop',
                     seats: {},
-                    state: { ...s, size, tiles: scramble(size), moves: 0, by: {} },
+                    state: { ...s, size: smaller, tiles: scramble(smaller), moves: 0, by: {} },
                   });
                 } finally {
                   setAgain(false);
                 }
               }}
             >
-              Again, with smaller pieces
+              {smaller > s.size ? 'Again, with smaller pieces' : 'Again'}
             </Button>
           )}
         </div>
@@ -219,6 +282,10 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
   const rows = standings(s, seated);
   const stillGoing = seated.filter((k) => !hasFinished(s.boards[k]));
   const name = (seat: string) => nameOf(people, game.seats[seat], me.id);
+  const band = bandOf(s);
+  const learn = useLearn('picture_puzzle');
+  const clues = cluesFor(band, learn, true);
+  const tips = usePuzzleTips(band, learn, board && !finished ? board.tiles : null, board?.swaps ?? 0, { race: true, peek: clues.peek });
 
   function settle(next: RaceState, g: Game<RaceState>): Update<RaceState> {
     if (!everyoneFinished(next, g.seats)) return { state: next };
@@ -250,7 +317,7 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
     setAgain(true);
     try {
       const players = seated.map((k) => game.seats[k] as number);
-      await startGame(game.room_id, 'picture_puzzle', { mode: 'versus', seats: playerSeats(players), state: newRace(s.media, s.size) });
+      await startGame(game.room_id, 'picture_puzzle', { mode: 'versus', seats: playerSeats(players), state: { ...newRace(s.media, s.size), band: s.band } });
     } finally {
       setAgain(false);
     }
@@ -356,11 +423,15 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
       ) : (
         <>
           <div className="pp-bar">
+            {clues.guide && <GuidePicture media={s.media} />}
             <span className="muted">Fewest swaps wins</span>
-            <Button size="sm" variant="ghost" icon="eye" onClick={() => setPeek(!peek)}>
-              {peek ? 'Hide picture' : 'Peek'}
-            </Button>
+            {clues.peek && (
+              <Button size="sm" variant="ghost" icon="eye" onClick={() => setPeek(!peek)}>
+                {peek ? 'Hide picture' : 'Peek'}
+              </Button>
+            )}
           </div>
+          <TipNote tip={tips.tip} onClose={tips.dismiss} />
           <Grid
             media={s.media}
             size={s.size}
@@ -368,7 +439,8 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
             held={held}
             locked={!canPlay || play.busy}
             done={false}
-            peek={peek}
+            peek={peek && clues.peek}
+            home={clues.home}
             onTap={(place) => canPlay && board.tiles[place] !== place && tap(place)}
           />
           <p className="muted center">{held === null ? 'Tap a piece, then tap where it should go.' : 'Now tap where it should go.'}</p>
@@ -462,19 +534,6 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
         )}
         {photos && photos.length === 0 && !preview && <p className="muted">No photos in this chat yet. Add a new one.</p>}
       </fieldset>
-      <div className="field">
-        <span className="field-label">Pieces</span>
-        <Segmented
-          label="Pieces"
-          value={String(value.size)}
-          onChange={(v) => onChange({ ...value, size: Number(v) })}
-          options={[
-            { value: '3', label: '9 big' },
-            { value: '4', label: '16' },
-            { value: '5', label: '25 small' },
-          ]}
-        />
-      </div>
     </>
   );
 }
@@ -487,10 +546,10 @@ export const picturePuzzle: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or a race for 2 to 6',
-  defaults: ({ me, room, mode }) => ({ mode, size: 3, media: null, file: null, players: defaultPlayers(room, me) }),
+  defaults: ({ me, room, mode }) => ({ mode, media: null, file: null, players: defaultPlayers(room, me) }),
   ready: (o) => !!(o.media || o.file) && (o.mode !== 'versus' || o.players.length > 0),
   Options,
-  create: async (o, { room, me, mode }) => {
+  create: async (o, { room, me, mode, band }) => {
     let media = o.media;
     if (o.file) {
       const prepared = await preparePhoto(o.file);
@@ -498,15 +557,29 @@ export const picturePuzzle: GameDef<State, Options> = {
     }
     if (!media) throw new Error('Choose a picture first.');
     const picture = { url: media.url, width: media.width ?? 1000, height: media.height ?? 1000 };
+    const size = sizeFor[band];
     if (mode === 'versus') {
-      return { mode, seats: playerSeats([me.id, ...o.players]), state: newRace(picture, o.size) };
+      return { mode, seats: playerSeats([me.id, ...o.players]), state: newRace(picture, size) };
     }
     return {
       mode: 'coop',
       seats: {},
-      state: { turn: 'anyone', media: picture, size: o.size, tiles: scramble(o.size), moves: 0, by: {} },
+      state: { turn: 'anyone', media: picture, size, tiles: scramble(size), moves: 0, by: {} },
     };
   },
+  bands: {
+    '5-7': '9 big pieces. The finished picture stays in view, and the right space lights up when you pick up a piece.',
+    '8-10': '16 pieces, with a peek at the finished picture whenever you need it.',
+    '11-13': '25 smaller pieces, with a peek when you need it.',
+    '14+': '36 small pieces and no peeking.',
+  },
+  basics: [
+    { art: '🧩', title: 'The aim', text: 'A photo has been cut into squares and jumbled up. Put every piece back where it belongs to finish the picture.' },
+    { art: '👆', title: 'Swapping', text: 'Tap a piece to pick it up, then tap the space where it should go. The two pieces swap places.' },
+    { art: '✅', title: 'Pieces in place', text: "A piece in its right place loses its outline and stays put, so it can't be moved by mistake." },
+    { art: '🔍', title: 'Where to look', text: 'Corners, sky, faces and bright colours are the easiest pieces to place. Start with those and fill in around them.' },
+    { art: '🏁', title: 'Together or a race', text: 'Together, everyone helps on one puzzle. In a race, everyone gets the same jumble and the fewest swaps wins.' },
+  ] satisfies Lesson[],
   Board,
   guide: [
     { title: 'The aim', body: 'A photo is cut into squares and jumbled up. Put it back together.' },

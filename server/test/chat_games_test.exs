@@ -1,6 +1,7 @@
 defmodule Family.ChatGamesTest do
   use Family.DataCase, async: false
-  alias Family.{Accounts, Chat, Games}
+  import Ecto.Query
+  alias Family.{Accounts, Chat, Games, Repo}
 
   setup do
     admin = admin_fixture()
@@ -91,6 +92,27 @@ defmodule Family.ChatGamesTest do
     assert {:ok, false} = Games.remove(kid, game.id)
     refute game.id in ids.(kid)
     assert {:error, :not_found} = Games.remove(kid, -1)
+  end
+
+  test "games nobody has touched for two days are put away", %{kid: kid, grownup: grownup, room: room} do
+    chess = %{"type" => "chess", "mode" => "versus", "seats" => %{"w" => kid.id, "b" => grownup.id}, "state" => %{"turn" => "w"}}
+    {:ok, quiet} = Games.create(kid, room.id, chess)
+    {:ok, recent} = Games.create(kid, room.id, chess)
+    {:ok, done} = Games.create(kid, room.id, chess)
+    {:ok, _} = Games.move(kid, done.id, %{"version" => 0, "state" => %{"turn" => "b"}, "status" => "finished", "summary" => "Mia won"})
+
+    now = DateTime.utc_now(:second)
+    age = fn game, hours -> Repo.update_all(from(g in Games.Game, where: g.id == ^game.id), set: [updated_at: DateTime.add(now, -hours * 3600)]) end
+    age.(quiet, 49)
+    age.(recent, 47)
+    age.(done, 100)
+
+    assert Games.finish_idle(now) == 1
+    assert %{status: "finished", summary: "Put away after two days with no moves", state: %{"ended" => "idle", "turn" => "w"}, version: 1} = Games.get(quiet.id)
+    assert %{status: "active"} = Games.get(recent.id)
+    assert %{summary: "Mia won"} = Games.get(done.id)
+    assert {:error, "That game has finished."} = Games.move(kid, quiet.id, %{"version" => 1, "state" => %{"turn" => "b"}})
+    assert Games.finish_idle(now) == 0
   end
 
   test "co-op games let anyone on the team move, and doodles append strokes", %{kid: kid, grownup: grownup, room: room} do

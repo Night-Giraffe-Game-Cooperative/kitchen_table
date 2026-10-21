@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { api } from '../lib/api';
-import type { GuideSection } from './learn';
+import type { GuideSection, Lesson } from './learn';
+import type { Band } from './bands';
 import type { IconName } from '../components/icons';
 import { go } from '../lib/router';
 import type { Game, Me, Person, Room } from '../lib/types';
@@ -46,6 +47,7 @@ export interface OptionsProps<O> {
   value: O;
   onChange: (o: O) => void;
   mode: Mode;
+  band: Band;
   room: Room;
   me: Me;
   people: Map<number, Person>;
@@ -61,10 +63,16 @@ export interface GameDef<S = any, O = any> {
   modeLabels?: Partial<Record<Mode, string>>;
   modeIcons?: Partial<Record<Mode, IconName>>;
   players: string;
-  defaults: (ctx: { me: Me; room: Room; mode: Mode }) => O;
+  defaults: (ctx: { me: Me; room: Room; mode: Mode; band: Band }) => O;
   Options?: ComponentType<OptionsProps<O>>;
-  /** May be async, e.g. to upload a photo or let the computer move first. */
-  create: (options: O, ctx: { me: Me; room: Room; mode: Mode; people: Map<number, Person> }) => NewGame<S> | Promise<NewGame<S>>;
+  /** May be async, e.g. to upload a photo or let the computer move first. The band is added to the state afterwards. */
+  create: (options: O, ctx: { me: Me; room: Room; mode: Mode; band: Band; people: Map<number, Person> }) => NewGame<S> | Promise<NewGame<S>>;
+  /** What each age band means in this game, shown when choosing one. */
+  bands: Record<Band, string>;
+  /** Options to change when the band changes, such as a suggested idea that was for another age. */
+  rebanded?: (options: O, band: Band) => O;
+  /** The basics, step by step, for learn mode. A game without them has no learn mode. */
+  basics?: Lesson[];
   ready?: (options: O) => boolean;
   Board: ComponentType<GameProps<S>>;
   /** One short line about where the game is at, for lists and chat cards. */
@@ -146,35 +154,6 @@ export function shuffle<T>(xs: T[], random = Math.random): T[] {
 export function pick<T>(xs: T[], random = Math.random): T {
   return xs[Math.floor(random() * xs.length)];
 }
-
-export const doodlePrompts = [
-  'a castle in the clouds',
-  'a dog riding a bicycle',
-  'the best sandwich ever',
-  'a dragon who wants a friend',
-  'our house as a spaceship',
-  'a cat wearing a crown',
-  'a monster who loves flowers',
-  'a picnic on the moon',
-  'a unicorn at the seaside',
-  'a robot making pancakes',
-  'a teddy bear on holiday',
-  'a tree with a door in it',
-  'the silliest hat',
-  'a snail in a hurry',
-  'a pirate ship in the bath',
-  'a whale in the sky',
-  'a birthday cake for a giraffe',
-  'a snowman in summer',
-  'a superhero hamster',
-  'the garden at night',
-  'a penguin at the shops',
-  'a rainbow train',
-  'grandma as a wizard',
-  'a sleepy owl',
-  'a giant strawberry',
-  'a bear having a bath',
-];
 
 /** Starts a new game in a room and opens it, for "play again" buttons. */
 export async function startGame(roomId: number, type: string, made: NewGame) {

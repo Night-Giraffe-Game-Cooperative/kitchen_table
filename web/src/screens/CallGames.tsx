@@ -17,6 +17,7 @@ import {
   type FaceGame,
 } from '../lib/callGames';
 import { useStore } from '../lib/store';
+import { defaultBand } from '../games/bands';
 import { whoCanChange } from '../lib/permissions';
 import { api } from '../lib/api';
 import { loadImage, toBlob, upload } from '../lib/image';
@@ -68,7 +69,7 @@ function Picker({
     if (!def || !room) return;
     setStarting(true);
     try {
-      const ctx = { me, room, mode: 'coop' as const, people };
+      const ctx = { me, room, mode: 'coop' as const, band: defaultBand(me), people };
       const made = await def.create(def.defaults(ctx), ctx);
       const res = await api.post<{ game: { id: number } }>(`/api/rooms/${room.id}/games`, { type: def.type, ...made });
       session.setGame({ kind: 'draw', gameId: res.game.id });

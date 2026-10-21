@@ -1,4 +1,4 @@
-// Computer opponent. Level 1 is a beginner that looks one move ahead and plays loosely; levels 2 and 3 are
+// Computer opponent. Level 1 is a beginner that looks one move ahead and plays loosely; levels 2 to 4 are
 // alpha-beta searches over the make/unmake board in core.ts, with quiescence on captures so they don't stop
 // counting in the middle of an exchange. Search buffers are allocated once and reused between calls.
 
@@ -8,7 +8,7 @@ import {
 import { toFen } from './rules';
 import type { Move, Position } from './rules';
 
-export type Level = 1 | 2 | 3; // 1 = gentle (young children can win), 2 = steady, 3 = tricky
+export type Level = 1 | 2 | 3 | 4; // 1 = gentle (young children can win), 2 = steady, 3 = tricky, 4 = strong
 
 // ---------------------------------------------------------------------------------------------------------------
 // Evaluation
@@ -496,7 +496,7 @@ function beginnerMove(moves: number[], random: () => number): number {
 
 /**
  * The computer's move, or null when there is none. `history` is optional and takes the same earlier-position FENs
- * as outcome(); with it, levels 2 and 3 steer away from repeating positions when they are ahead.
+ * as outcome(); with it, levels 2 to 4 steer away from repeating positions when they are ahead.
  */
 export function chooseMove(
   pos: Position, level: Level, random: () => number = Math.random, history?: string[],
@@ -507,5 +507,6 @@ export function chooseMove(
   if (moves.length === 1) return toMove(moves[0]);
   if (level <= 1) return toMove(beginnerMove(moves, random));
   if (level === 2) return toMove(searchRoot(moves, 3, 600, 20, random, history));
-  return toMove(searchRoot(moves, 5, 700, 0, random, history));
+  if (level === 3) return toMove(searchRoot(moves, 5, 700, 0, random, history));
+  return toMove(searchRoot(moves, 10, 1500, 0, random, history));
 }

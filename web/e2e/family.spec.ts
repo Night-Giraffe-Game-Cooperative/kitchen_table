@@ -241,6 +241,45 @@ test('Backgammon: just me against the computer', async () => {
   await expect(admin.locator('.bg-last')).toContainText('computer', { ignoreCase: true, timeout: 15_000 });
 });
 
+test('age groups and learn mode', async () => {
+  await admin.getByRole('link', { name: /^Games\b/ }).click();
+  await admin.getByRole('button', { name: 'New game' }).click();
+  const dialog = admin.getByRole('dialog');
+  await dialog.getByRole('button', { name: /Chess/ }).click();
+  await dialog.getByRole('radio', { name: '14+' }).click();
+  await expect(dialog).toContainText('A strong computer that thinks further ahead, and no tips or hints.');
+  await dialog.getByRole('radio', { name: '5–7' }).click();
+  await expect(dialog).toContainText('A gentle computer that young children can beat');
+  await dialog.getByRole('switch', { name: 'Learn mode' }).click();
+  await shot(admin, '17a-ages-and-learn-mode');
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+
+  // The basics a step at a time, then a reminder that learn mode is on.
+  const basics = admin.locator('.basics');
+  await expect(basics).toContainText('The basics · 1 of 6');
+  await basics.getByRole('button', { name: 'Next' }).click();
+  await expect(basics).toContainText('2 of 6');
+  await shot(admin, '17b-learn-the-basics');
+  await basics.getByRole('button', { name: 'Skip' }).click();
+  await expect(admin.locator('.learn-bar')).toContainText('Learn mode is on');
+  await expect(admin.locator('.tip-note')).toContainText('The aim is checkmate');
+  await admin.locator('.learn-bar').getByRole('button', { name: 'Switch off' }).click();
+  await expect(admin.locator('.learn-bar')).toHaveCount(0);
+
+  // Story Chain for the youngest: simple starts and words to begin a line with.
+  await admin.getByRole('link', { name: /^Games\b/ }).click();
+  await admin.getByRole('button', { name: 'New game' }).click();
+  await dialog.getByRole('button', { name: /Story Chain/ }).click();
+  await expect(dialog.getByRole('radio', { name: '5–7' })).toBeChecked();
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await admin.getByRole('group', { name: 'Start your line with' }).getByRole('button', { name: 'Suddenly' }).click();
+  await expect(admin.getByLabel('What happens next?')).toHaveValue('Suddenly ');
+  await admin.getByRole('button', { name: 'Idea' }).click();
+  await expect(admin.locator('.tip-note p')).toHaveText(/Give them a name|see, hear or smell|day or night|really want/);
+  await shot(admin, '17c-story-chain-for-5-to-7');
+  await admin.evaluate(() => localStorage.removeItem('games:band'));
+});
+
 test('a grown-up signs in, and the Me page', async ({ browser }) => {
   const mum = await open(browser, { width: 820, height: 1180 });
   await mum.goto('/');

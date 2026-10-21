@@ -7,8 +7,9 @@ import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, Update } from '../common';
 import { nameOf } from '../common';
 import { chooseSequence, type Level } from './ai';
-import { TipNote, useTips } from '../learn';
-import { backgammonGuide, endTip, pickTips, stepTips, turnTips } from './learn';
+import { TipNote, useLearn, useTips } from '../learn';
+import { bandOf, type Band } from '../bands';
+import { backgammonBasics, backgammonGuide, endTip, pickTips, stepTips, theirTurnTip, turnTips } from './learn';
 import {
   applyMove,
   canMove,
@@ -44,7 +45,6 @@ interface State {
 }
 
 interface Options {
-  level: Level;
   opponent: number | 'open';
   /** Against the computer: everyone in the chat as one team, or just the person starting it. */
   who: 'team' | 'me';
@@ -52,6 +52,8 @@ interface Options {
 
 const seatOf = (s: Side): Seat => (s === 'w' ? 'white' : 'black');
 const levels: Record<Level, string> = { 1: 'gentle', 2: 'steady', 3: 'tricky' };
+/** How well the computer plays for each age band. */
+const levelFor: Record<Band, Level> = { '5-7': 1, '8-10': 2, '11-13': 3, '14+': 3 };
 
 /** Point number as the mover counts it: 1 is the last point before home. */
 function pointName(i: number | 'bar' | 'off', side: Side): string {
@@ -135,13 +137,22 @@ function Board({ game, play, me, people }: GameProps<State>) {
   const sources = new Set(choices.map((m) => m.from));
   const dests = from === null ? [] : choices.filter((m) => m.from === from);
   const turnOver = !!work && choices.length === 0;
-  const tips = useTips('backgammon');
+  const band = bandOf(s);
+  const learn = useLearn('backgammon');
+  const tips = useTips('backgammon', { band, learn });
 
-  // Before the roll: the race and the dice. After it: the bar, bearing off, doubles.
+  // Before the roll: the race and the dice, and in learn mode what the other side just did. After it: the bar, bearing off, doubles.
   useEffect(() => {
     if (done) return void tips.offer(endTip(s.pos));
-    if (myTurn && !openSeat) tips.offer(...turnTips(s.pos, s.dice, !!s.roll));
-  }, [game.version, myTurn, done]);
+    if (!myTurn || openSeat) return;
+    const last = s.last;
+    const who = last ? game.seats[seatOf(last.side)] : undefined;
+    const theirs =
+      learn && last && !s.roll && last.side !== s.pos.turn
+        ? theirTurnTip(last.roll, last.moves.length, s.pos.bar[s.pos.turn] > 0, who === 'computer' ? 'The computer' : nameOf(people, who), String(game.version))
+        : null;
+    tips.offer(theirs, ...turnTips(s.pos, s.dice, !!s.roll));
+  }, [game.version, myTurn, done, learn]);
 
   async function roll() {
     setThinking(coop);
@@ -484,19 +495,6 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
             { value: 'me', label: 'Just me', icon: 'me' },
           ]}
         />
-      </div>
-      <div className="field">
-        <span className="field-label">The computer plays</span>
-        <Segmented
-          label="The computer plays"
-          value={String(value.level)}
-          onChange={(v) => onChange({ ...value, level: Number(v) as Level })}
-          options={[
-            { value: '1', label: 'Gentle' },
-            { value: '2', label: 'Steady' },
-            { value: '3', label: 'Tricky' },
-          ]}
-        />
         <p className="field-hint">
           {value.who === 'team' ? 'The family plays white, and anyone in the chat can roll and move for the family.' : 'You play white, and the others can watch.'}
         </p>
@@ -527,17 +525,24 @@ export const backgammon: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 players',
-  defaults: () => ({ level: 1, opponent: 'open', who: 'team' }),
+  defaults: () => ({ opponent: 'open', who: 'team' }),
   Options,
-  create: (o, { me, mode }) =>
+  create: (o, { me, mode, band }) =>
     mode === 'coop'
       ? {
           mode,
           seats: { white: o.who === 'me' ? me.id : 'team', black: 'computer' },
-          state: { turn: 'white', pos: initial('w'), roll: null, dice: [], last: null, level: o.level },
+          state: { turn: 'white', pos: initial('w'), roll: null, dice: [], last: null, level: levelFor[band] },
           title: o.who === 'me' ? `Backgammon: ${me.name} vs computer` : 'Backgammon: family vs computer',
         }
       : { mode, seats: { white: me.id, black: o.opponent }, state: { turn: 'white', pos: initial('w'), roll: null, dice: [], last: null } },
+  bands: {
+    '5-7': 'A gentle computer that young children can beat, and tips about every move.',
+    '8-10': 'A steady computer, and tips about every move.',
+    '11-13': 'A tricky computer, and tips only for hitting, the bar and bearing off.',
+    '14+': 'A tricky computer, and no tips.',
+  },
+  basics: backgammonBasics,
   Board,
   guide: backgammonGuide,
   status: (g, me, people) => {
