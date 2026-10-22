@@ -581,7 +581,7 @@ test('friends from another family: a guardian from each says yes, and family fro
   await expect(admin.getByText("Ollie's account has gone.")).toBeVisible();
 });
 
-test('rewards, reminders for grown-ups, and homework', async () => {
+test('rewards, reminders, homework, and labels on buttons', async () => {
   // A task for Mia that earns two stars, a sticker and 50p.
   await admin.getByRole('link', { name: /^Calendar\b/ }).click();
   await admin.getByRole('radio', { name: 'Tasks' }).click();
@@ -637,11 +637,48 @@ test('rewards, reminders for grown-ups, and homework', async () => {
   await kid.reload();
   await expect(kid.getByRole('checkbox', { name: /Make the bed/ })).toBeVisible();
   await expect(kid.getByText('What the kids need')).toHaveCount(0);
+  await expect(kid.getByText(/PE kit/)).toHaveCount(0);
 
-  // Mia adds her own homework and hands it in on time.
+  // Mia sets a reminder for herself. It's on her Today, and Alex sees it too.
+  const kidDialog = kid.getByRole('dialog');
+  await kid.getByRole('radio', { name: 'Tasks' }).click();
+  await kid.getByRole('button', { name: 'Reminder', exact: true }).click();
+  await kidDialog.getByLabel('What you need').fill('Library book');
+  await kidDialog.getByRole('button', { name: '📚' }).click();
+  await kidDialog.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(kid.locator('.cal-event', { hasText: 'Library book' })).toContainText('Every day');
+  await kid.getByRole('radio', { name: 'Today' }).click();
+  await expect(kid.getByRole('heading', { name: 'Things to remember' })).toBeVisible();
+  const book = kid.getByRole('checkbox', { name: /^Library book/ });
+  await book.click();
+  await expect(book).toHaveAttribute('aria-checked', 'true');
+  await expect(kid.getByText(/PE kit/)).toHaveCount(0);
+  await shot(kid, '32a-phone-my-reminder');
+  await expect(admin.getByRole('checkbox', { name: /Mia: Library book/ })).toHaveAttribute('aria-checked', 'true');
+
+  // The (i) beside a heading explains it, and a held button says what it does.
+  await admin.getByRole('button', { name: "About today's tasks" }).click();
+  await expect(admin.locator('.info-note')).toContainText('Tap a task to tick it off.');
+  await shot(admin, '32b-info-note');
+  await admin.keyboard.press('Escape');
+  await expect(admin.locator('.info-note')).toHaveCount(0);
+  await admin.getByRole('radio', { name: 'Tasks' }).click();
+  await admin.getByRole('button', { name: 'Next week' }).hover();
+  await expect(admin.locator('.tip-bubble')).toHaveText('Next week');
+  await kid.getByRole('radio', { name: 'Tasks' }).click();
+  const next = kid.getByRole('button', { name: 'Next week' });
+  await next.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, bubbles: true });
+  await expect(kid.locator('.tip-bubble')).toHaveText('Next week');
+  await shot(kid, '32c-phone-hold-for-a-label');
+  await next.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true, bubbles: true });
+  await next.dispatchEvent('click');
+  await expect(kid.locator('.week-name')).toContainText('This week');
+
+  // Mia adds her own homework and hands it in on time. What she sets herself earns nothing.
   await kid.getByRole('radio', { name: 'Homework' }).click();
   await kid.getByRole('button', { name: 'Add homework' }).first().click();
-  const kidDialog = kid.getByRole('dialog');
+  await expect(kidDialog.getByText(/Tasks you set yourself are just for you/)).toBeVisible();
+  await expect(kidDialog.getByRole('switch', { name: 'A surprise sticker' })).toHaveCount(0);
   await kidDialog.getByLabel('Subject').fill('Maths');
   await kidDialog.getByLabel('What to do').fill('Times tables');
   await kidDialog.getByRole('button', { name: 'Add', exact: true }).click();

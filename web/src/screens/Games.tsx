@@ -53,7 +53,9 @@ function GameList() {
           {mine.length > 0 && <GameSection title="Your turn" games={mine} />}
           {playing.length > 0 && <GameSection title="Playing" games={playing} />}
           {finished.length > 0 && <GameSection title="Finished" games={finished} />}
-          <p className="muted games-hint">To take a game off your list, press and hold it, or right-click it.</p>
+          <p className="muted games-hint">
+            To take a game off your list, press and hold it, or right-click it. A game nobody has played for two days is put away as finished.
+          </p>
         </>
       )}
       <NewGameDialog open={creating} onClose={() => setCreating(false)} />

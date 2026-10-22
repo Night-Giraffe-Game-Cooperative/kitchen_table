@@ -149,7 +149,8 @@ export function HomeworkRow({
     try {
       const on = today();
       await api.post(`/api/tasks/${t.id}/status`, { status: next, on });
-      if (next === 'handed_in') toast(reward && t.due_on && on <= t.due_on ? `Handed in on time. That earns ${reward}!` : 'Handed in.', 'success');
+      const onTime = !!t.due_on && on <= t.due_on;
+      if (next === 'handed_in') toast(onTime ? (reward ? `Handed in on time. That earns ${reward}!` : 'Handed in on time. Well done!') : 'Handed in.', 'success');
     } catch (e) {
       toast(errorText(e), 'danger');
       live.reload();

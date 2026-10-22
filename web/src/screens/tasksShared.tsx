@@ -130,7 +130,7 @@ export function taskPeople(tasks: Task[], me: Me, personOf: (id: number) => Pers
 
 export function Stars({ n }: { n: number }) {
   return (
-    <span className="stars" title="Tasks done this week">
+    <span className="stars" data-tip="Stars this week">
       <span aria-hidden="true">⭐</span> {n}
       <span className="sr-only"> done this week</span>
     </span>

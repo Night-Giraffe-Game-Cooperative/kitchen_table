@@ -36,6 +36,7 @@ import {
 } from '../lib/days';
 import type { CalendarEvent, CalendarLink, DayPart, Me, Person, Repeat, Task, TaskKind } from '../lib/types';
 import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Input, Notice, Segmented, Select, TextArea, Toggle } from '../components/ui';
+import { InfoTip } from '../components/tips';
 import { Icon } from '../components/icons';
 import { Stars, canChange, canSetFor, errorText, taskPeople, tint, useLive, usePersonOf, useTasks, useToday } from './tasksShared';
 import { HomeworkView, TodayHomework, rewardText } from './Homework';
@@ -158,10 +159,16 @@ export function CalendarScreen({ view = 'today' }: { view?: CalendarView }) {
 
 // ---------- Today ----------
 
-/** Reminders of what the kids need today, to tick once packed, and what they need tomorrow. */
+/**
+ * Reminders of what the kids need today, to tick once packed, and what they
+ * need tomorrow. A kid sees the reminders they set themselves.
+ */
 function KidsNeed({ tasks, day, live, onEdit }: { tasks: Task[]; day: Day; live: ReturnType<typeof useTasks>; onEdit: (t: Task) => void }) {
   const { me } = useStore();
   const personOf = usePersonOf();
+  // A kid sees only their own reminders, so they aren't named.
+  const mine = me.role === 'kid';
+  const named = (t: Task, who: Person) => (mine ? t.title : `${who.name}: ${t.title}`);
   const reminders = tasks.filter((t) => t.kind === 'reminder');
   const pairs = (on: Day) =>
     reminders
@@ -176,7 +183,7 @@ function KidsNeed({ tasks, day, live, onEdit }: { tasks: Task[]; day: Day; live:
   return (
     <section className="cal-section" aria-labelledby="kids-need">
       <h2 className="section-label" id="kids-need">
-        What the kids need
+        {mine ? 'Things to remember' : 'What the kids need'}
       </h2>
       {todays.length > 0 && (
         <ul className="jobs-list need-list">
@@ -197,16 +204,14 @@ function KidsNeed({ tasks, day, live, onEdit }: { tasks: Task[]; day: Day; live:
                     {t.emoji}
                   </span>
                   <span className="job-text">
-                    <strong>
-                      {kid.name}: {t.title}
-                    </strong>
+                    <strong>{named(t, kid)}</strong>
                     <span className="muted">{packed ? 'Sorted' : (t.notes ?? 'Today')}</span>
                   </span>
                   <span className="job-box" aria-hidden="true">
                     <Icon name="check" size={26} />
                   </span>
                 </button>
-                {changeable && <IconButton icon="pen" size="sm" label={`Change ${t.title} for ${kid.name}`} onClick={() => onEdit(t)} />}
+                {changeable && <IconButton icon="pen" size="sm" label={mine ? `Change ${t.title}` : `Change ${t.title} for ${kid.name}`} onClick={() => onEdit(t)} />}
               </li>
             );
           })}
@@ -214,7 +219,7 @@ function KidsNeed({ tasks, day, live, onEdit }: { tasks: Task[]; day: Day; live:
       )}
       {tomorrows.length > 0 && (
         <p className="need-tomorrow">
-          <strong>Tomorrow:</strong> {tomorrows.map(({ task: t, kid }) => `${t.emoji} ${t.title} for ${kid.name}`).join(', ')}
+          <strong>Tomorrow:</strong> {tomorrows.map(({ task: t, kid: who }) => `${t.emoji} ${t.title}${mine ? '' : ` for ${who.name}`}`).join(', ')}
         </p>
       )}
     </section>
@@ -269,9 +274,15 @@ function TodayView({
       {tasks.error && !tasks.data && <Notice tone="danger">{tasks.error}</Notice>}
 
       <section className="cal-section" aria-labelledby="today-tasks">
-        <h2 className="section-label" id="today-tasks">
-          Today's tasks
-        </h2>
+        <div className="with-info">
+          <h2 className="section-label" id="today-tasks">
+            Today's tasks
+          </h2>
+          <InfoTip about="today's tasks">
+            Tap a task to tick it off. Everyone ticks off their own, and a guardian can tick off a child's. Anyone can add tasks for themselves;
+            {me.role === 'kid' ? " the ones you set yourself don't earn rewards." : " the ones kids set themselves don't earn rewards."}
+          </InfoTip>
+        </div>
         {tasks.data && people.length === 0 && (
           <div className="cal-empty sheet">
             <p>No tasks today. Set some up, like feeding the cat or reading, and tick them off as they're done.</p>
@@ -289,7 +300,7 @@ function TodayView({
 
       <TodayHomework tasks={allTasks} day={day} live={tasks} />
 
-      {me.role !== 'kid' && <KidsNeed tasks={allTasks} day={day} live={tasks} onEdit={onEditTask} />}
+      <KidsNeed tasks={allTasks} day={day} live={tasks} onEdit={onEditTask} />
 
       {sees && (
         <>
@@ -628,30 +639,46 @@ function TasksView({ onEdit, onAdd }: { onEdit: (t: Task) => void; onAdd: (perso
         />
       ))}
 
-      {me.role !== 'kid' && tasks.data && <ReminderList reminders={reminders} onEdit={onEdit} onAdd={() => onAdd(undefined, 'reminder')} />}
+      {tasks.data && <ReminderList reminders={reminders} onEdit={onEdit} onAdd={() => onAdd(undefined, 'reminder')} />}
     </>
   );
 }
 
-/** The reminders grown-ups have set of what the kids need, and when. */
+/** Reminders of what the kids need, and when: the ones grown-ups set and the ones kids set themselves. A kid sees only their own. */
 function ReminderList({ reminders, onEdit, onAdd }: { reminders: Task[]; onEdit: (t: Task) => void; onAdd: () => void }) {
   const { me } = useStore();
   const personOf = usePersonOf();
+  const kid = me.role === 'kid';
   return (
     <section className="cal-section" aria-labelledby="reminders">
       <div className="cal-section-head">
-        <h2 className="section-label" id="reminders">
-          Reminders for guardians
-        </h2>
+        <span className="with-info">
+          <h2 className="section-label" id="reminders">
+            {kid ? 'My reminders' : 'Reminders for guardians'}
+          </h2>
+          <InfoTip about="reminders">
+            {kid
+              ? 'Your reminders show on your Today when they come round, and the day before under Tomorrow. Your guardians see them too.'
+              : "Reminders show on Today for the guardians at home, and the day before under Tomorrow. Kids see the reminders they set themselves, but not the ones you set."}
+          </InfoTip>
+        </span>
         <Button size="sm" icon="plus" onClick={onAdd}>
           Reminder
         </Button>
       </div>
-      {reminders.length === 0 && <p className="muted">Things the kids need on certain days, like PE kit on Tuesdays. They show on your Today and the day before.</p>}
+      {reminders.length === 0 && (
+        <p className="muted">
+          {kid
+            ? 'Things you need on certain days, like your swimming bag on Thursdays. They show on your Today and the day before.'
+            : 'Things the kids need on certain days, like PE kit on Tuesdays. They show on your Today and the day before.'}
+        </p>
+      )}
       <ul className="cal-events">
         {reminders.map((t) => {
           const changeable = canChange(me, t, personOf);
           const kids = t.user_ids.map((id) => personOf(id)?.name).filter(Boolean);
+          const setter = t.created_by_id === null ? undefined : personOf(t.created_by_id);
+          const byKid = !kid && setter?.role === 'kid' ? ` · set by ${setter.name}` : '';
           return (
             <li key={t.id}>
               <button type="button" className="cal-event sheet" disabled={!changeable} onClick={() => onEdit(t)}>
@@ -662,7 +689,7 @@ function ReminderList({ reminders, onEdit, onAdd }: { reminders: Task[]; onEdit:
                 <span className="cal-event-text">
                   <strong>{t.title}</strong>
                   <span className="muted">
-                    {kids.join(' and ')} · {daysLabel(t)}
+                    {kid ? daysLabel(t) : `${kids.join(' and ')} · ${daysLabel(t)}${byKid}`}
                   </span>
                 </span>
               </button>
@@ -1170,7 +1197,7 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
   const personOf = usePersonOf();
   const existing = edit.task;
   const [kind, setKind] = useState<TaskKind>(existing?.kind ?? edit.kind ?? 'job');
-  const text = kindText[kind];
+  const text = me.role === 'kid' && kind === 'reminder' ? { ...kindText.reminder, title: 'What you need', placeholder: 'Swimming bag' } : kindText[kind];
   const [title, setTitle] = useState(existing?.title ?? '');
   const [emoji, setEmoji] = useState(existing?.emoji ?? text.emoji[0]);
   const [notes, setNotes] = useState(existing?.notes ?? '');
@@ -1188,8 +1215,10 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
   const [part, setPart] = useState<DayPart>(existing?.part ?? 'any');
   const [stars, setStars] = useState(existing?.stars ?? 1);
   const [pounds, setPounds] = useState(existing?.pence ? (existing.pence / 100).toFixed(2) : '');
-  // Stars and pocket money come from grown-ups, so a kid's own tasks earn a sticker.
-  const [sticker, setSticker] = useState(existing?.sticker ?? me.role === 'kid');
+  const [sticker, setSticker] = useState(existing?.sticker ?? false);
+  // Rewards come from grown-ups, so the tasks a kid sets themselves earn none.
+  const setter = !existing ? me : existing.created_by_id === null ? undefined : personOf(existing.created_by_id);
+  const rewardless = me.role === 'kid' || setter?.role === 'kid';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1236,7 +1265,7 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
             days: preset === 'once' ? [] : preset === 'some' ? days : presetDays[preset],
             on_date: preset === 'once' ? onDate : '',
           }),
-      ...(kind === 'reminder' ? {} : me.role === 'kid' ? { sticker } : { stars, pence, sticker }),
+      ...(kind === 'reminder' || rewardless ? {} : { stars, pence, sticker }),
     };
     setBusy(true);
     try {
@@ -1275,7 +1304,7 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
   const kinds: { value: TaskKind; label: string }[] = [
     { value: 'job', label: 'Task' },
     { value: 'homework', label: 'Homework' },
-    ...(me.role !== 'kid' ? [{ value: 'reminder' as const, label: 'Reminder' }] : []),
+    { value: 'reminder', label: 'Reminder' },
   ];
   const starOptions = [0, 1, 2, 3, ...(stars > 3 ? [stars] : [])];
 
@@ -1300,7 +1329,13 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
     >
       <form id="task-form" className="stack" onSubmit={save}>
         {!existing && <Segmented label="What kind" value={kind} options={kinds} onChange={changeKind} />}
-        {kind === 'reminder' && <p className="muted">A reminder for guardians of something a kid needs, like PE kit on Tuesdays. It shows on your Today and the day before.</p>}
+        {kind === 'reminder' && (
+          <p className="muted">
+            {me.role === 'kid'
+              ? 'A reminder of something you need, like your swimming bag on Thursdays. It shows on your Today and the day before, and your guardians see it too.'
+              : 'A reminder for guardians of something a kid needs, like PE kit on Tuesdays. It shows on your Today and the day before.'}
+          </p>
+        )}
 
         {kind === 'homework' && (
           <Field label="Subject">
@@ -1366,7 +1401,7 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
                       className="day-option"
                       aria-pressed={days.includes(i + 1)}
                       aria-label={weekdayNames[i]}
-                      title={weekdayNames[i]}
+                      data-tip={weekdayNames[i]}
                       onClick={() => setDays(days.includes(i + 1) ? days.filter((d) => d !== i + 1) : [...days, i + 1].sort())}
                     >
                       {l}
@@ -1408,26 +1443,27 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
           </Field>
         )}
 
-        {kind !== 'reminder' && (
+        {kind !== 'reminder' && rewardless && (
+          <p className="muted">
+            {me.role === 'kid'
+              ? "Tasks you set yourself are just for you, so they don't earn stars, stickers or pocket money. Those come with the tasks your guardians set."
+              : `${setter?.name ?? 'A child'} set this one, so it doesn't earn rewards. Set a task of your own for them to give a reward.`}
+          </p>
+        )}
+        {kind !== 'reminder' && !rewardless && (
           <fieldset className="fieldset">
             <legend>{kind === 'homework' ? 'Handed in on time, it earns' : "Each time it's done, it earns"}</legend>
             <div className="stack-sm">
-              {me.role === 'kid' ? (
-                <p className="muted">{existing?.stars ? `⭐ ${existing.stars} from a guardian` : 'A guardian can add stars to it.'}</p>
-              ) : (
-                <Segmented
-                  label="Stars"
-                  value={String(stars)}
-                  onChange={(v) => setStars(Number(v))}
-                  options={starOptions.map((n) => ({ value: String(n), label: n === 0 ? 'No stars' : `⭐ ${n}` }))}
-                />
-              )}
+              <Segmented
+                label="Stars"
+                value={String(stars)}
+                onChange={(v) => setStars(Number(v))}
+                options={starOptions.map((n) => ({ value: String(n), label: n === 0 ? 'No stars' : `⭐ ${n}` }))}
+              />
               <Toggle label="A surprise sticker" hint="One picked at random for their sticker book." checked={sticker} onChange={setSticker} />
-              {me.role !== 'kid' && (
-                <Field label="Pocket money (£)" hint="Leave empty for none. It adds up until you mark it paid.">
-                  {(p) => <Input {...p} type="number" inputMode="decimal" min="0" step="0.05" value={pounds} onChange={(e) => setPounds(e.target.value)} placeholder="0.50" />}
-                </Field>
-              )}
+              <Field label="Pocket money (£)" hint="Leave empty for none. It adds up until you mark it paid.">
+                {(p) => <Input {...p} type="number" inputMode="decimal" min="0" step="0.05" value={pounds} onChange={(e) => setPounds(e.target.value)} placeholder="0.50" />}
+              </Field>
             </div>
           </fieldset>
         )}

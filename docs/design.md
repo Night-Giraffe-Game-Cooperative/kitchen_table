@@ -385,3 +385,15 @@ before playing, and every tip every game. The device remembers the last age
 group chosen; children start on 5–7 and grown-ups on 8–10. A game nobody has
 moved in for two days is put away as finished by the server once an hour, so
 the Games list doesn't fill with games everyone has forgotten.
+
+**22 Oct 2026. Kids' own tasks and reminders, and labels you can hold.**
+Kids can set tasks, homework and reminders for themselves, with no reward:
+rewards come from guardians, so a task a kid set earns nothing even if a
+grown-up changes it later (a guardian who wants to reward it sets their own).
+A kid sees the reminders they set and their guardians see them too, while
+the ones grown-ups set about a kid stay with the grown-ups. Icon buttons had
+only the browser's own hover text, which never shows on a tablet, where the
+family mostly plays. They now show a label on hover, keyboard focus, or a
+press and hold, and a hold doesn't press the button, so holding is a safe way
+to ask "what does this do?". Most screens already explain themselves in a
+line of grey text, so the (i) notes are kept to the few places that didn't.

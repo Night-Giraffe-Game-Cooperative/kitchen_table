@@ -517,7 +517,7 @@ function MessageItem({
                   type="button"
                   className="reaction"
                   aria-pressed={r.user_ids.includes(me.id)}
-                  title={names}
+                  data-tip={names}
                   aria-label={`${r.emoji} from ${names}`}
                   disabled={readOnly}
                   onClick={() => react(r.emoji)}

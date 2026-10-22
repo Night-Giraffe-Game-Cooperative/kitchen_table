@@ -2,9 +2,10 @@ defmodule Family.Tasks do
   @moduledoc """
   Daily tasks: small jobs that come round on chosen days of the week (or once),
   ticked off by each person they're for. Two other kinds live alongside them:
-  reminders, which tell grown-ups what a child needs on a day (PE kit,
-  swimming bag) and which the child never sees; and homework, set on one day,
-  due on another, and moved along from to do to handed in.
+  reminders of what a child needs on a day (PE kit, swimming bag), which
+  grown-ups set for the kids at home and kids can set for themselves; and
+  homework, set on one day, due on another, and moved along from to do to
+  handed in. A child never sees the reminders grown-ups set about them.
 
   Everyone sees the tasks of the people in their own bubble, so a household
   has one chart; admins see everyone's. Anyone can set tasks for themselves,
@@ -17,9 +18,8 @@ defmodule Family.Tasks do
 
   Jobs and homework can earn rewards: stars, pocket money and stickers. Each
   tick keeps what it earned. Grown-ups mark pocket money paid, and set goals
-  (a treat for so many stars) for the kids they look after. Stars and pocket
-  money come from grown-ups, so the tasks kids set themselves earn stickers
-  until a grown-up adds more.
+  (a treat for so many stars) for the kids they look after. Rewards come from
+  grown-ups, so the tasks kids set themselves earn none.
   """
 
   import Ecto.Query
@@ -63,7 +63,13 @@ defmodule Family.Tasks do
       Repo.all(from t in Task, order_by: [asc: t.id])
       |> Enum.reject(&(&1.kind == "homework" and &1.status == "handed_in" and Date.compare(&1.due_on, long_ago) == :lt))
       |> Enum.map(fn t ->
-        people = if t.kind == "reminder", do: reminded, else: visible
+        people =
+          cond do
+            t.kind != "reminder" -> visible
+            user.role == "kid" -> if t.created_by_id == user.id, do: [user.id], else: []
+            true -> reminded
+          end
+
         %{t | user_ids: Enum.filter(t.user_ids, &(&1 in people))}
       end)
       |> Enum.reject(&(&1.user_ids == []))
@@ -81,7 +87,8 @@ defmodule Family.Tasks do
     end
   end
 
-  # Reminders are for the grown-ups of the children in their own bubble.
+  # Reminders are for the grown-ups of the children in their own bubble, and
+  # kids see only the ones they set themselves.
   defp reminded_ids(%User{role: "kid"}, _), do: []
   defp reminded_ids(%User{bubble_id: nil}, _), do: []
 
@@ -89,11 +96,10 @@ defmodule Family.Tasks do
     do: Repo.all(from u in User, where: u.id in ^visible and u.bubble_id == ^bubble, select: u.id)
 
   def create(%User{} = user, attrs) do
-    task = if user.role == "kid", do: %Task{created_by_id: user.id, stars: 0, pence: 0}, else: %Task{created_by_id: user.id}
+    task = if user.role == "kid", do: %Task{created_by_id: user.id, stars: 0, pence: 0, sticker: false}, else: %Task{created_by_id: user.id}
     changeset = Task.changeset(task, clean(attrs, user))
 
     with :ok <- uses_tasks(user),
-         :ok <- may_remind(user, Ecto.Changeset.get_field(changeset, :kind)),
          :ok <- may_set_all(user, Ecto.Changeset.get_field(changeset, :user_ids)),
          {:ok, task} <- Repo.insert(changeset) do
       changed(task.user_ids)
@@ -104,9 +110,9 @@ defmodule Family.Tasks do
   def update(%User{} = user, id, attrs) do
     with :ok <- uses_tasks(user),
          %Task{} = task <- Repo.get(Task, id) || {:error, :not_found},
-         :ok <- may_remind(user, task.kind),
+         :ok <- may_remind(user, task),
          :ok <- may_change(user, task),
-         changeset = Task.changeset(task, clean(attrs, user)),
+         changeset = Task.changeset(task, clean(attrs, user, task)),
          :ok <- may_set_all(user, Ecto.Changeset.get_field(changeset, :user_ids)),
          {:ok, updated} <- Repo.update(changeset) do
       changed(task.user_ids ++ updated.user_ids)
@@ -117,7 +123,7 @@ defmodule Family.Tasks do
   def delete(%User{} = user, id) do
     with :ok <- uses_tasks(user),
          %Task{} = task <- Repo.get(Task, id) || {:error, :not_found},
-         :ok <- may_remind(user, task.kind),
+         :ok <- may_remind(user, task),
          :ok <- may_change(user, task) do
       Repo.delete!(task)
       changed(task.user_ids)
@@ -130,7 +136,7 @@ defmodule Family.Tasks do
     with :ok <- uses_tasks(actor),
          %Task{} = task <- Repo.get(Task, task_id) || {:error, :not_found},
          true <- task.kind != "homework" || {:error, "Homework is handed in rather than ticked."},
-         :ok <- may_remind(actor, task.kind),
+         :ok <- may_remind(actor, task),
          true <- person_id in task.user_ids || {:error, "That task isn't theirs."},
          %User{} = person <- Accounts.get_user(person_id) || {:error, :not_found},
          true <- can_set?(actor, person) || {:error, :forbidden},
@@ -303,8 +309,9 @@ defmodule Family.Tasks do
   def due?(%Task{on_date: %Date{} = d}, on), do: Date.compare(d, on) == :eq
   def due?(%Task{days: days}, on), do: Date.day_of_week(on) in days
 
-  # Kids don't make or see reminders; those are for grown-ups.
-  defp may_remind(%User{role: "kid"}, "reminder"), do: {:error, :forbidden}
+  # The reminders grown-ups set about a kid stay with the grown-ups; a kid
+  # handles only the ones they set themselves.
+  defp may_remind(%User{role: "kid", id: id}, %Task{kind: "reminder", created_by_id: by}) when by != id, do: {:error, :forbidden}
   defp may_remind(_, _), do: :ok
 
   defp may_change(%User{role: "kid", id: id}, %Task{created_by_id: by}) when by != id, do: {:error, :forbidden}
@@ -321,10 +328,18 @@ defmodule Family.Tasks do
     end
   end
 
+  defp by_kid?(nil), do: false
+  defp by_kid?(id), do: Repo.exists?(from u in User, where: u.id == ^id and u.role == "kid")
+
   defp uses_tasks(user), do: if(Permissions.can?(user, :tasks), do: :ok, else: {:error, :forbidden})
 
-  # Stars and pocket money come from grown-ups, so kids leave them as they are.
-  defp clean(attrs, %User{role: "kid"}), do: attrs |> clean(nil) |> Map.drop(~w(stars pence))
+  # Rewards come from grown-ups: kids leave them as they are, and a task a kid
+  # set themselves earns none, whoever changes it.
+  defp clean(attrs, user, %Task{created_by_id: by}) do
+    if user.role == "kid" or by_kid?(by), do: clean(attrs, %User{role: "kid"}), else: clean(attrs, user)
+  end
+
+  defp clean(attrs, %User{role: "kid"}), do: attrs |> clean(nil) |> Map.drop(~w(stars pence sticker))
 
   defp clean(attrs, _) do
     attrs

@@ -13,6 +13,7 @@ import { MePage } from './Me';
 import { isMyTurn } from '../games/registry';
 import { CallScreen } from './Call';
 import { IncomingCall } from '../components/IncomingCall';
+import { TipLayer } from '../components/tips';
 import { ConfirmHost } from '../components/confirm';
 import { waitingOnMe } from '../lib/contacts';
 
@@ -52,6 +53,7 @@ export function Shell() {
       <>
         <CallScreen roomId={route.roomId} />
         <IncomingCall />
+        <TipLayer />
         <Toasts toasts={toasts} dismissToast={dismissToast} />
       </>
     );
@@ -114,6 +116,7 @@ export function Shell() {
       </main>
 
       <IncomingCall />
+      <TipLayer />
       <ConfirmHost />
       <Toasts toasts={toasts} dismissToast={dismissToast} />
     </div>

@@ -3193,6 +3193,82 @@ button {
 /* ---------- Learning the games ---------- */
 
 /* A tip: a small yellow paper note pinned under the board. */
+/* What a button does, on hover, focus or press-and-hold (components/tips.tsx). */
+.tip-bubble {
+  position: fixed;
+  z-index: 200;
+  max-width: min(18rem, calc(100vw - 16px));
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: var(--shadow-lift);
+  animation: tip-in var(--motion-fast) var(--ease);
+}
+
+/* The note behind an (i): a sentence or two on paper. */
+.tip-bubble.info-note {
+  max-width: min(20rem, calc(100vw - 16px));
+  padding: 0.65rem 0.8rem;
+  background: var(--warning-soft);
+  color: var(--ink);
+  border: 1px solid var(--divider);
+  font-weight: 450;
+  line-height: 1.45;
+}
+
+/* A heading or line with an (i) beside it. */
+.with-info {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.with-info > h2 {
+  margin-block: 0.5rem;
+}
+
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-inline-start: 0.35rem;
+  padding: 0;
+  border: 1.5px solid var(--edge);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font: italic 700 0.8rem/1 Georgia, 'Times New Roman', serif;
+  vertical-align: middle;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  position: relative;
+  flex: none;
+}
+
+/* A bigger target than it looks, for small fingers. */
+.info-tip::after {
+  content: '';
+  position: absolute;
+  inset: -0.6rem;
+}
+
+.info-tip[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.icon-btn,
+[data-tip] {
+  -webkit-touch-callout: none;
+}
+
 .tip-note {
   display: flex;
   align-items: flex-start;

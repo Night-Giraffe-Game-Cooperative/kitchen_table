@@ -125,7 +125,7 @@ function Radio({
       role="radio"
       aria-checked={checked}
       aria-label={label}
-      title={label}
+      data-tip={label}
       tabIndex={checked || tabbable ? 0 : -1}
       className={className}
       style={style}

@@ -227,7 +227,7 @@ export function InkTray({
               style={{ '--pen': c.value } as CSSProperties}
               aria-pressed={settings.tool === 'pen' && settings.colour === c.value}
               aria-label={`${c.name} felt tip`}
-              title={c.name}
+              data-tip={c.name}
               onClick={() => onChange({ ...settings, tool: 'pen', colour: c.value })}
             />
           ))}
@@ -241,7 +241,7 @@ export function InkTray({
               style={{ '--dot': `${8 + i * 7}px`, '--pen': settings.tool === 'pen' ? settings.colour : '#24201d' } as CSSProperties}
               aria-pressed={settings.size === i}
               aria-label={label}
-              title={label}
+              data-tip={label}
               onClick={() => onChange({ ...settings, size: i as InkSettings['size'] })}
             />
           ))}
@@ -255,7 +255,7 @@ export function InkTray({
             className="ink-sticker"
             aria-pressed={settings.tool === s.id}
             aria-label={s.name}
-            title={s.name}
+            data-tip={s.name}
             onClick={() => onChange({ ...settings, tool: settings.tool === s.id ? 'pen' : s.id })}
           >
             <StickerIcon sticker={s.id} />

@@ -7,6 +7,7 @@ import { bubbleFeatures, permissionText, roleDefaults, switchedOffBy } from '../
 import { friendshipBetween, isGrownUp, isGuardianOf, mayTalk, waitingOnMe, whyNot } from '../lib/contacts';
 import type { Bubble, BubbleFeature, Colour, Friendship, Permission, Person, Role } from '../lib/types';
 import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Input, Notice, RoleBadge, Segmented, Select, Toggle } from '../components/ui';
+import { InfoTip } from '../components/tips';
 import { Icon } from '../components/icons';
 import { confirmFirst } from '../components/confirm';
 
@@ -742,7 +743,7 @@ export function ColourPicker({ value, colours, onChange }: { value: Colour; colo
             className={`colour-option tint-${c}`}
             aria-pressed={value === c}
             aria-label={colourNames[c]}
-            title={colourNames[c]}
+            data-tip={colourNames[c]}
             onClick={() => onChange(c)}
           >
             <span className={`colour-dot ink-${c}`} />
@@ -779,7 +780,13 @@ function WaitingForYou() {
   if (!waiting.length) return null;
   return (
     <section className="waiting sheet" aria-labelledby="waiting-head">
-      <h2 id="waiting-head">Waiting for your yes</h2>
+      <div className="with-info">
+        <h2 id="waiting-head">Waiting for your yes</h2>
+        <InfoTip about="waiting for your yes">
+          A child wants to chat with a child from another family. They can chat once a guardian from each family says yes. Either family can stop it
+          later, and what was said stays readable.
+        </InfoTip>
+      </div>
       <ul className="friend-list">
         {waiting.map((f) => (
           <FriendAsk key={f.id} friendship={f} />

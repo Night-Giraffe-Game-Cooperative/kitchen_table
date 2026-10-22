@@ -66,7 +66,7 @@ export function IconButton({
       type={type}
       className={['icon-btn', `btn-${variant}`, `icon-btn-${size}`, className].filter(Boolean).join(' ')}
       aria-label={label}
-      title={label}
+      data-tip={label}
       aria-pressed={pressed}
       {...rest}
     >

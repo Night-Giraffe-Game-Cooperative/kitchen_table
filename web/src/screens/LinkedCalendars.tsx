@@ -153,7 +153,7 @@ function LinkRow({ link: l, onSettings, onSynced }: { link: CalendarLink; onSett
         )}
       </span>
       <span className="link-actions">
-        <Button size="sm" variant="ghost" icon="refresh" busy={busy} onClick={sync} aria-label={`Check ${l.name} now`} title={`Check ${l.name} now`} />
+        <Button size="sm" variant="ghost" icon="refresh" busy={busy} onClick={sync} aria-label={`Check ${l.name} now`} data-tip={`Check ${l.name} now`} />
         {l.can_manage && (
           <Button size="sm" icon="pen" onClick={onSettings} aria-label={`Change ${l.name}`}>
             Change

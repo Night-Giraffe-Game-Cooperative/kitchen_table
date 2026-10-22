@@ -174,13 +174,22 @@ for anyone, and a tick shows on every screen at once.
 surprise sticker for the sticker book. Each tick keeps what it earned, so
 changing a task later doesn't rewrite the past. Pocket money adds up until a
 guardian marks it paid (all or some, with an undo), and grown-ups set goals: a treat for so many stars, counted from when the
-goal is set, with a bar filling up and "Mark given" once it's reached. Kids
-can make tasks for themselves but can't pay themselves for them. Kids see only their own rewards.
+goal is set, with a bar filling up and "Mark given" once it's reached.
+Rewards come from guardians: kids can set tasks, homework and reminders for
+themselves, but the ones they set don't earn anything. Kids see only their own rewards.
 
-**Reminders for guardians.** Things a child needs on certain days, like PE kit
+**Reminders.** Things a child needs on certain days, like PE kit
 on Tuesdays or a swimming bag on Fridays. They show on a grown-up's Today
 under "What the kids need", to tick once sorted, with tomorrow's listed
-underneath so bags can be packed the night before. Kids never see them.
+underneath so bags can be packed the night before. Kids can set reminders for
+themselves too, which show on their own Today under "Things to remember" and
+to their guardians as well; kids never see the ones grown-ups set.
+
+**Labels and notes.** Every button that's only a picture says what it does:
+on hover with a mouse, on keyboard focus, and when pressed and held on a
+tablet or phone (the hold shows the label instead of pressing it). A small (i)
+beside a few ideas that need a sentence of explaining (today's tasks,
+reminders, rewards, waiting for your yes) opens a note.
 
 **Homework.** Set on one day, due on another, with a subject and notes. Kids
 add their own and move it along: to do, started, done, handed in. It shows on

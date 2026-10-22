@@ -141,13 +141,20 @@ defmodule Family.TasksTest do
     assert :ok = Tasks.unpay(admin, payout.id)
     assert %{paid_pence: 0} = mine.(admin)
 
-    # Kids can make tasks for themselves, but can't pay themselves for them.
-    # Stars and pocket money come from grown-ups: a kid's own task earns none until one adds them.
-    {:ok, own} = Tasks.create(mia, teeth([mia.id], %{"title" => "Read", "pence" => 500, "stars" => 5}))
-    assert %{pence: 0, stars: 0} = own
-    {:ok, own} = Tasks.update(jo, own.id, %{"stars" => 2})
+    # Kids can make tasks for themselves, but rewards come from grown-ups, so
+    # a kid's own task earns nothing, whoever changes it.
+    {:ok, own} = Tasks.create(mia, teeth([mia.id], %{"title" => "Read", "pence" => 500, "stars" => 5, "sticker" => true}))
+    assert %{pence: 0, stars: 0, sticker: false} = own
+    {:ok, own} = Tasks.update(jo, own.id, %{"stars" => 2, "sticker" => true, "title" => "Read every day"})
+    assert %{title: "Read every day", stars: 0, sticker: false} = own
     {:ok, own} = Tasks.update(mia, own.id, %{"title" => "Read a chapter", "stars" => 5, "pence" => 500})
-    assert %{title: "Read a chapter", pence: 0, stars: 2} = own
+    assert %{title: "Read a chapter", pence: 0, stars: 0} = own
+    :ok = Tasks.tick(mia, own.id, mia.id, ~D[2026-10-21], true)
+    assert %{stars: 4, stickers: [_, _]} = mine.(jo)
+
+    # A grown-up's task can still be changed by them without touching its rewards.
+    {:ok, bed} = Tasks.update(jo, bed.id, %{"title" => "Make the bed nicely"})
+    assert %{stars: 2, sticker: true} = bed
   end
 
   test "goals: a treat for so many stars", %{mia: mia, jo: jo} do
@@ -165,7 +172,6 @@ defmodule Family.TasksTest do
 
   test "reminders are for grown-ups at home, about a child", %{admin: admin, mia: mia, jo: jo, sam: sam} do
     pe = %{"kind" => "reminder", "title" => "PE kit", "emoji" => "👟", "user_ids" => [mia.id], "days" => [2], "stars" => 3, "pence" => 20}
-    assert {:error, :forbidden} = Tasks.create(mia, pe)
     {:ok, reminder} = Tasks.create(jo, pe)
     assert %{kind: "reminder", stars: 0, pence: 0} = reminder
 
@@ -174,8 +180,27 @@ defmodule Family.TasksTest do
     refute seen.(mia) or seen.(sam)
 
     assert {:error, :forbidden} = Tasks.tick(mia, reminder.id, mia.id, ~D[2026-10-20], true)
+    assert {:error, :forbidden} = Tasks.update(mia, reminder.id, %{"title" => "No PE"})
+    assert {:error, :forbidden} = Tasks.delete(mia, reminder.id)
     assert :ok = Tasks.tick(jo, reminder.id, mia.id, ~D[2026-10-20], true)
     assert %{stars: 0} = Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id))
+  end
+
+  test "kids set reminders for themselves, and their grown-ups see them too", %{mia: mia, ruby: ruby, jo: jo, sam: sam} do
+    swim = %{"kind" => "reminder", "title" => "Swimming bag", "emoji" => "🏊", "user_ids" => [mia.id], "days" => [4]}
+    assert {:error, :forbidden} = Tasks.create(mia, Map.put(swim, "user_ids", [ruby.id]))
+    {:ok, own} = Tasks.create(mia, swim)
+    {:ok, jos} = Tasks.create(jo, %{swim | "title" => "Library book"})
+
+    seen = fn who -> who |> Tasks.list(~D[2026-10-19], ~D[2026-10-25]) |> elem(0) |> Enum.filter(&(&1.kind == "reminder")) |> Enum.map(& &1.title) end
+    assert seen.(mia) == ["Swimming bag"]
+    assert seen.(jo) == ["Swimming bag", "Library book"]
+    assert seen.(ruby) == [] and seen.(sam) == []
+
+    assert :ok = Tasks.tick(mia, own.id, mia.id, ~D[2026-10-22], true)
+    assert {:ok, %{title: "Swimming kit"}} = Tasks.update(mia, own.id, %{"title" => "Swimming kit"})
+    assert {:error, :forbidden} = Tasks.tick(mia, jos.id, mia.id, ~D[2026-10-22], true)
+    assert :ok = Tasks.delete(mia, own.id)
   end
 
   test "homework: set, moved along and handed in on time for its reward", %{mia: mia, ruby: ruby, jo: jo, sam: sam} do

@@ -5,6 +5,7 @@ import { money } from '../lib/days';
 import { ago } from '../lib/time';
 import type { Goal, Person, Rewards } from '../lib/types';
 import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Input, Notice } from '../components/ui';
+import { InfoTip } from '../components/tips';
 import { canSetFor, errorText, tint, useLive, usePersonOf } from './tasksShared';
 import { confirmFirst } from '../components/confirm';
 
@@ -36,6 +37,16 @@ export function RewardsView() {
         <EmptyState art="🏆" title="No rewards yet">
           <p>Tasks and homework can earn stars, pocket money and stickers. Set a reward when you add a task, and it shows here as it's earned.</p>
         </EmptyState>
+      )}
+      {shown.length > 0 && (
+        <p className="muted with-info">
+          How rewards work
+          <InfoTip about="how rewards work">
+            {me.role === 'kid'
+              ? "Stars, stickers and pocket money come from the tasks and homework your guardians set, each time you tick one off or hand homework in on time. Tasks you set yourself are just for you, so they don't earn any."
+              : "Stars, stickers and pocket money come from the tasks and homework guardians set: each time a task is ticked off, or homework is handed in on time. Pocket money adds up until you mark it paid. The tasks kids set themselves don't earn rewards."}
+          </InfoTip>
+        </p>
       )}
       <div className="jobs-grid">
         {shown.map(({ r, person }) => (
