@@ -79,7 +79,7 @@ function changeable(e: CalendarEvent, canEdit: boolean, links: Links): boolean {
 
 // ---------- The screen ----------
 
-export function CalendarScreen({ view = 'today' }: { view?: CalendarView }) {
+export function CalendarScreen({ view = 'today', linkAccount }: { view?: CalendarView; linkAccount?: number }) {
   const { me } = useStore();
   const sees = seesCalendar(me);
   const canEdit = sees && me.permissions.edit_calendar;
@@ -153,6 +153,8 @@ export function CalendarScreen({ view = 'today' }: { view?: CalendarView }) {
       {eventEdit && <EventDialog edit={eventEdit} canEdit={canEdit} links={links} onClose={() => setEventEdit(null)} />}
       {taskEdit && <TaskDialog edit={taskEdit} onClose={() => setTaskEdit(null)} />}
       {linking && <LinkedCalendarsDialog onClose={() => setLinking(false)} />}
+      {/* Back from signing in to Google or Microsoft: on to choosing its calendars. */}
+      {linkAccount && <LinkedCalendarsDialog account={linkAccount} onClose={() => go({ name: 'calendar', view: 'month' })} />}
     </div>
   );
 }

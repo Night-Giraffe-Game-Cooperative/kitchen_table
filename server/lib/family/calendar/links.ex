@@ -4,8 +4,9 @@ defmodule Family.Calendar.Links do
 
   Anyone who can change the family calendar can link one. A CalDAV calendar
   (iCloud, Fastmail, Nextcloud and the like) goes both ways: its events show
-  here, and events added or changed here are saved in it. A calendar's
-  address (an .ics feed, such as Google's or Outlook's secret address, or a
+  here, and events added or changed here are saved in it. So do Google and
+  Outlook calendars, once someone signs in to their account
+  (Family.Calendar.Connect). A calendar's address (an .ics feed, such as a
   school's) is shown here only.
 
   Whoever links a calendar chooses who sees it: the whole family, or only
@@ -20,7 +21,10 @@ defmodule Family.Calendar.Links do
   alias Family.{Permissions, Repo}
   alias Family.Accounts.User
   alias Family.Calendar
-  alias Family.Calendar.{DAV, Event, ICal, Link, Vault}
+  alias Family.Calendar.{Account, Connect, DAV, Event, Google, ICal, Link, Microsoft, Vault}
+
+  # Reached through an account someone signed in to.
+  @signed_in ~w(google microsoft)
 
   @behind_days 90
   @ahead_days 400
@@ -85,6 +89,18 @@ defmodule Family.Calendar.Links do
     end
   end
 
+  def add(%User{} = user, %{"provider" => provider} = attrs) when provider in @signed_in do
+    chosen = attrs["calendars"] |> List.wrap() |> Enum.filter(&is_map/1)
+
+    with :ok <- may_link(user),
+         :ok <- if(chosen == [], do: {:error, "Choose at least one calendar."}, else: :ok),
+         {:ok, account} <- own_account(user, attrs["account"], provider),
+         # Only the calendars the account really has, as the provider describes them.
+         {:ok, found} <- with_token(account, &api(provider).calendars/1) |> account_error(account) do
+      link_picked(user, attrs, found, chosen, %{provider: provider, account_id: account.id, username: account.email, secret: nil})
+    end
+  end
+
   def add(%User{} = user, attrs) do
     chosen = attrs["calendars"] |> List.wrap() |> Enum.filter(&is_map/1)
 
@@ -94,47 +110,82 @@ defmodule Family.Calendar.Links do
          {:ok, {username, password} = auth} <- auth(attrs),
          # Only the calendars the account really has, as the server describes them.
          {:ok, found} <- url |> DAV.discover(auth) |> signed_in(provider) do
-      names = Map.new(chosen, &{&1["url"], present(&1["name"])})
-      picked = Enum.filter(found, &Map.has_key?(names, &1.url))
-      default? = attrs["share"] != "me" and not Repo.exists?(from l in Link, where: l.default)
+      link_picked(user, attrs, found, chosen, %{provider: "caldav", username: username, secret: Vault.seal(password)})
+    end
+  end
 
-      if picked == [] do
-        {:error, "Those calendars weren't found. Look for them again."}
-      else
-        Repo.transaction(fn ->
-          picked
-          |> Enum.with_index()
-          |> Enum.map(fn {cal, i} ->
-            fields = %{
-              provider: "caldav",
+  # Links the calendars someone chose from those an account has, each copied here straight away.
+  defp link_picked(user, attrs, found, chosen, fields) do
+    names = Map.new(chosen, &{&1["url"], present(&1["name"])})
+    picked = Enum.filter(found, &Map.has_key?(names, &1.url))
+    default? = attrs["share"] != "me" and not Repo.exists?(from l in Link, where: l.default)
+
+    if picked == [] do
+      {:error, "Those calendars weren't found. Look for them again."}
+    else
+      Repo.transaction(fn ->
+        picked
+        |> Enum.with_index()
+        |> Enum.map(fn {cal, i} ->
+          fields =
+            Map.merge(fields, %{
               url: cal.url,
               name: String.slice(names[cal.url] || cal.name, 0, 60),
               color: cal.color,
               writable: cal.writable,
-              username: username,
-              secret: Vault.seal(password),
               # The first family calendar that can be added to is where new events go.
               default: default? and cal.writable and i == Enum.find_index(picked, & &1.writable),
               ctag: nil
-            }
+            })
 
-            case insert(user, attrs, fields) do
-              {:ok, link} -> link
-              {:error, changeset} -> Repo.rollback(changeset)
-            end
-          end)
+          case insert(user, attrs, fields) do
+            {:ok, link} -> link
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
         end)
-        |> case do
-          {:ok, links} ->
-            Enum.each(links, &sync/1)
-            {:ok, Enum.map(links, &get(&1.id))}
+      end)
+      |> case do
+        {:ok, links} ->
+          Enum.each(links, &sync/1)
+          {:ok, Enum.map(links, &get(&1.id))}
 
-          error ->
-            error
-        end
+        error ->
+          error
       end
     end
   end
+
+  @doc """
+  The calendars in a Google or Microsoft account someone has just signed in
+  to, for choosing which to link: `{:ok, account, calendars}`.
+  """
+  def account_calendars(%User{} = user, account_id) do
+    with :ok <- may_link(user),
+         {:ok, account} <- own_account(user, account_id, nil),
+         {:ok, calendars} <- with_token(account, &api(account.provider).calendars/1) |> account_error(account) do
+      {:ok, account, calendars}
+    end
+  end
+
+  defp own_account(%User{id: user_id}, id, provider) do
+    with {id, ""} <- Integer.parse(to_string(id || "")),
+         %Account{user_id: ^user_id} = account <- Repo.get(Account, id),
+         true <- is_nil(provider) or account.provider == provider do
+      {:ok, account}
+    else
+      _ -> {:error, "Sign in to that account again, then choose its calendars."}
+    end
+  end
+
+  defp account_error({:error, reason}, %Account{} = account) when reason in [:signed_out, :unauthorized],
+    do: {:error, "#{Connect.name(account.provider)} wouldn't let the app in. Sign in again."}
+
+  defp account_error({:error, reason}, %Account{} = account) when not is_binary(reason) do
+    Logger.warning("#{Connect.name(account.provider)} account #{account.id}: #{inspect(reason) |> String.slice(0, 200)}")
+    {:error, "#{Connect.name(account.provider)} couldn't be reached just now. Try again in a minute."}
+  end
+
+  defp account_error(other, _), do: other
 
   defp insert(user, attrs, fields) do
     %Link{}
@@ -216,6 +267,12 @@ defmodule Family.Calendar.Links do
          :ok <- if(may_manage?(user, link), do: :ok, else: {:error, :forbidden}) do
       Repo.delete_all(from e in Event, where: e.link_id == ^link.id)
       Repo.delete!(link)
+
+      # Once none of an account's calendars is linked, it's let go.
+      if link.account_id && not Repo.exists?(from l in Link, where: l.account_id == ^link.account_id) do
+        with %Account{} = account <- Repo.get(Account, link.account_id), do: Connect.forget(account)
+      end
+
       changed(link)
       :ok
     end
@@ -283,6 +340,22 @@ defmodule Family.Calendar.Links do
     end
   end
 
+  defp copy(%Link{provider: provider} = link, opts) when provider in @signed_in do
+    with_token(link, fn token ->
+      with {:ok, ctag} <- remote_ctag(provider, token, link.url) do
+        if !opts[:force] and is_binary(ctag) and ctag == link.ctag and link.synced_on == Date.utc_today() do
+          {:ok, ctag, false}
+        else
+          {from, to} = window()
+
+          with {:ok, rows} <- api(provider).events(token, link.url, from, to, zone()) do
+            {:ok, ctag, store(link, rows)}
+          end
+        end
+      end
+    end)
+  end
+
   defp copy(%Link{provider: "ics"} = link, opts) do
     with {:ok, feed} <- if(opts[:feed], do: {:ok, opts[:feed]}, else: DAV.fetch(link.url)) do
       hash = :crypto.hash(:sha256, feed.data) |> Base.encode16(case: :lower) |> binary_part(0, 32)
@@ -293,6 +366,43 @@ defmodule Family.Calendar.Links do
         {from, to} = window()
         rows = feed.data |> ICal.occurrences(from, to, zone()) |> Enum.map(&Map.merge(&1, %{remote_href: nil, remote_etag: nil}))
         {:ok, hash, store(link, rows)}
+      end
+    end
+  end
+
+  # Google says when a calendar last changed; Outlook's are copied in full each time.
+  defp remote_ctag("google", token, calendar), do: Google.ctag(token, calendar)
+  defp remote_ctag(_, _, _), do: {:ok, nil}
+
+  defp api("google"), do: Google
+  defp api("microsoft"), do: Microsoft
+
+  # Runs `fun` with an access token for a link's account (or the account
+  # itself), getting a new one once if the provider turns the old one down.
+  defp with_token(%Link{account_id: nil}, _fun), do: {:error, :signed_out}
+
+  defp with_token(%Link{account_id: id}, fun) do
+    case Repo.get(Account, id) do
+      nil -> {:error, :signed_out}
+      account -> with_token(account, fun)
+    end
+  end
+
+  defp with_token(%Account{} = account, fun) do
+    with {:ok, token} <- Connect.token(account) do
+      case fun.(token) do
+        {:error, :unauthorized} ->
+          Connect.stale(account)
+
+          with {:ok, token} <- Connect.token(Repo.get(Account, account.id) || account) do
+            case fun.(token) do
+              {:error, :unauthorized} -> {:error, :signed_out}
+              other -> other
+            end
+          end
+
+        other ->
+          other
       end
     end
   end
@@ -353,6 +463,17 @@ defmodule Family.Calendar.Links do
   ## Changes made here
 
   @doc "Saves a new event in a linked calendar, then copies it back here."
+  def create_event(%Link{provider: provider} = link, %Event{} = event) when provider in @signed_in do
+    case with_token(link, &api(provider).create(&1, link.url, event)) do
+      {:ok, id} ->
+        sync(link, force: true)
+        {:ok, Repo.one(from e in Event, where: e.link_id == ^link.id and e.remote_href == ^id, order_by: [e.start_date, e.starts_at], limit: 1) || event}
+
+      error ->
+        write_error(error, link)
+    end
+  end
+
   def create_event(%Link{} = link, %Event{} = event) do
     uid = Ecto.UUID.generate()
     href = String.trim_trailing(link.url, "/") <> "/" <> uid <> ".ics"
@@ -367,6 +488,17 @@ defmodule Family.Calendar.Links do
   end
 
   @doc "Changes an event in its linked calendar, keeping whatever else that calendar keeps on it."
+  def update_event(%Link{provider: provider} = link, %Event{} = row, %Event{} = event) when provider in @signed_in do
+    case with_token(link, &api(provider).update(&1, link.url, row.remote_href, event, row.remote_etag)) do
+      :ok ->
+        sync(link, force: true)
+        {:ok, Repo.get(Event, row.id) || event}
+
+      error ->
+        write_error(error, link)
+    end
+  end
+
   def update_event(%Link{} = link, %Event{} = row, %Event{} = event) do
     with {:ok, auth} <- credentials(link),
          {:ok, %{data: data, etag: etag}} <- DAV.get(row.remote_href, auth),
@@ -380,6 +512,18 @@ defmodule Family.Calendar.Links do
   end
 
   @doc "Deletes an event from its linked calendar."
+  def delete_event(%Link{provider: provider} = link, %Event{} = row) when provider in @signed_in do
+    case with_token(link, &api(provider).delete(&1, link.url, row.remote_href)) do
+      :ok ->
+        Repo.delete_all(from e in Event, where: e.link_id == ^link.id and e.remote_href == ^row.remote_href)
+        changed(link)
+        :ok
+
+      error ->
+        write_error(error, link)
+    end
+  end
+
   def delete_event(%Link{} = link, %Event{} = row) do
     with {:ok, auth} <- credentials(link),
          :ok <- DAV.delete(row.remote_href, auth, nil) do
@@ -395,6 +539,9 @@ defmodule Family.Calendar.Links do
 
   defp error_text(:unauthorized, link),
     do: "#{link.name} wouldn't let the app in. Its password may have changed: put the new one in under Linked calendars, then Change."
+
+  defp error_text(:signed_out, link),
+    do: "#{link.name} needs signing in to #{Connect.name(link.provider)} again. Whoever linked it can do that under Linked calendars, then Change."
 
   defp error_text(:changed, link), do: "That event just changed in #{link.name}. Look again and try once more."
   defp error_text(:gone, link), do: "That event isn't in #{link.name} any more."

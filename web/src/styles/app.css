@@ -1861,6 +1861,11 @@ button {
   cursor: pointer;
 }
 
+.choice:disabled {
+  cursor: default;
+  box-shadow: none;
+}
+
 .choice > span:last-child {
   display: flex;
   flex-direction: column;

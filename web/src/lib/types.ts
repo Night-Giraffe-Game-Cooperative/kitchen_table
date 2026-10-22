@@ -178,8 +178,8 @@ export interface CalendarEvent {
   repeat: Repeat;
   repeat_until: string | null;
   who: number[];
-  /** app: kept here. caldav or ics: from a linked calendar, one row per day it happens. */
-  source: 'app' | 'caldav' | 'ics';
+  /** app: kept here. caldav, google, microsoft or ics: from a linked calendar, one row per day it happens. */
+  source: 'app' | 'caldav' | 'google' | 'microsoft' | 'ics';
   link_id: number | null;
   /** One time of something that repeats in its linked calendar, so it's changed there. */
   recurring: boolean;
@@ -189,7 +189,7 @@ export interface CalendarEvent {
 export interface CalendarLink {
   id: number;
   user_id: number;
-  provider: 'caldav' | 'ics';
+  provider: 'caldav' | 'google' | 'microsoft' | 'ics';
   name: string;
   color: string;
   /** family: everyone who sees the calendar. me: only whoever linked it. */
@@ -201,10 +201,24 @@ export interface CalendarLink {
   host: string;
   /** Only for whoever linked it. */
   username: string | null;
+  /** The Google or Microsoft account it's reached through, for signing in again. Only for whoever linked it. */
+  account_id: number | null;
   last_synced_at: string | null;
   last_error: string | null;
   can_write: boolean;
   can_manage: boolean;
+}
+
+/** Signing in to Google or Microsoft to link their calendars, as set up on this server. */
+export interface ConnectProvider {
+  provider: 'google' | 'microsoft';
+  /** Set up, so anyone who can link calendars can sign in. */
+  ready: boolean;
+  /** An admin can paste in (or change) the app registered with it. */
+  can_setup: boolean;
+  /** For admins: what to give the provider when registering the app, and the client ID saved. */
+  redirect_uri?: string;
+  client_id?: string | null;
 }
 
 /** A calendar an account has, found when linking. */

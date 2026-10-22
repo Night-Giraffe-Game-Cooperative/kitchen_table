@@ -2,6 +2,7 @@ import { chromium, expect, test, type Browser, type Page } from '@playwright/tes
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { startFakeCaldav } from './fixtures/fakeCaldav';
+import { googleClient, microsoftClient, startFakeConnect } from './fixtures/fakeConnect';
 import { startFakePush } from './fixtures/fakePush';
 
 // One family, start to finish: the first admin sets up, adds a kid and a
@@ -855,6 +856,78 @@ test('the family calendar, linked both ways with a calendar the family already u
     await shot(kid, '37-phone-calendar');
   } finally {
     caldav.close();
+  }
+});
+
+test('Google and Outlook calendars, linked both ways by signing in', async () => {
+  const stand = await startFakeConnect();
+  try {
+    await admin.getByRole('link', { name: /^Calendar\b/ }).click();
+    await admin.getByRole('radio', { name: 'Month' }).click();
+    await admin.getByRole('button', { name: 'Linked calendars' }).click();
+    const dialog = admin.getByRole('dialog');
+
+    // Set up once by an admin, with the app registered with Google.
+    await dialog.getByRole('button', { name: /^Google/ }).click();
+    await expect(dialog.getByRole('heading', { name: 'Set up signing in to Google' })).toBeVisible();
+    await expect(dialog.getByLabel('Redirect address')).toHaveValue(/\/calendar-connect\/google$/);
+    await dialog.getByLabel('Client ID').fill('GOCSPX-not-the-id');
+    await dialog.getByLabel('Client secret').fill(googleClient.secret);
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog.getByText("Google's client ID ends in .apps.googleusercontent.com.")).toBeVisible();
+    await shot(admin, '48-google-setup');
+    await dialog.getByLabel('Client ID').fill(googleClient.id);
+    await dialog.getByRole('button', { name: 'Save' }).click();
+
+    // Then anyone who can change the calendar signs in and picks calendars.
+    await dialog.getByRole('button', { name: /^Google/ }).click();
+    await expect(dialog.getByText(/hasn't checked this app/)).toBeVisible();
+    await dialog.getByRole('button', { name: 'Continue to Google' }).click();
+    await admin.getByRole('link', { name: 'Allow' }).click();
+    await expect(dialog.getByText('Signed in to Google as family.calendar@gmail.com.')).toBeVisible();
+    await expect(dialog.getByRole('checkbox', { name: /Family/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('checkbox', { name: /Holidays/ })).toContainText('Shown here only');
+    await shot(admin, '49-google-pick');
+    await dialog.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(admin).toHaveURL(/#\/calendar\/month$/);
+    await expect(admin.locator('.month-item', { hasText: 'Bake sale' })).toBeVisible();
+
+    // Added here, saved in Google, with its emoji kept alongside.
+    await admin.getByRole('button', { name: 'Add an event' }).click();
+    await dialog.getByLabel("What's happening").fill('Cinema');
+    await dialog.getByLabel('Calendar').selectOption({ label: 'Family (Google)' });
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => [...stand.google.values()].some((i) => i.summary === 'Cinema')).toBe(true);
+
+    // Outlook isn't set up yet, so only an admin can start it; the same steps follow.
+    await admin.getByRole('button', { name: 'Linked calendars' }).click();
+    await expect(dialog.locator('.link-row', { hasText: 'Google' })).toContainText('Google · both ways');
+    await dialog.getByRole('button', { name: /^Outlook/ }).click();
+    await dialog.getByLabel('Application (client) ID').fill(microsoftClient.id);
+    await dialog.getByLabel('Client secret').fill(microsoftClient.secret);
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await dialog.getByRole('button', { name: /^Outlook/ }).click();
+    await dialog.getByRole('button', { name: 'Continue to Microsoft' }).click();
+    await admin.getByRole('link', { name: 'Allow' }).click();
+    await expect(dialog.getByText('Signed in to Microsoft as family.calendar@outlook.com.')).toBeVisible();
+    await dialog.getByRole('radio', { name: 'Just me' }).click();
+    await dialog.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await admin.getByRole('button', { name: 'Linked calendars' }).click();
+    await expect(dialog.locator('.link-row', { hasText: 'Outlook' })).toContainText('only you see it');
+    await shot(admin, '50-linked-google-outlook');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(admin.locator('.month-item', { hasText: 'Dentist' }).first()).toBeVisible();
+
+    // Mia sees the family's Google calendar, not Alex's own Outlook one.
+    await kid.goto('/#/calendar');
+    await kid.getByRole('radio', { name: 'Month' }).click();
+    await expect(kid.locator('.month-item', { hasText: 'Bake sale' })).toBeVisible();
+    await expect(kid.locator('.month-item', { hasText: 'Cinema' })).toBeVisible();
+  } finally {
+    stand.close();
   }
 });
 

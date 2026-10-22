@@ -226,6 +226,10 @@ colour. Anyone who can change the calendar links one from **Calendar**,
   [account.apple.com](https://account.apple.com/account/manage), under
   Sign-In and Security, App-Specific Passwords. Put in the Apple ID email and
   that password, then choose which calendars to link.
+- **Google** and **Outlook**, both ways: sign in to Google or Microsoft and
+  choose which calendars. This needs Kitchen Table registered with Google and
+  with Microsoft as your own app, once, by an admin:
+  [calendar-sign-in.md](calendar-sign-in.md) has the steps.
 - **Another calendar server**, both ways: any CalDAV server (Fastmail,
   Nextcloud, Zoho, Yahoo and most others) with its address, a username and a
   password.
@@ -236,8 +240,9 @@ colour. Anyone who can change the calendar links one from **Calendar**,
 
 Whoever links a calendar chooses whether the family sees it or only they do.
 Passwords are sealed with a key made from the server's secret and never sent
-back to a browser. CalDAV calendars are checked every five minutes, addresses
-every hour, and the refresh button beside each one checks at once. Events are
+back to a browser, and so are Google and Microsoft sign-ins. CalDAV and
+Google calendars are checked every five minutes, Outlook ones every ten,
+addresses every hour, and the refresh button beside each one checks at once. Events are
 copied for three months behind and a year ahead. Something that repeats in a
 linked calendar is changed in that calendar; one-off events can be changed
 here or there.

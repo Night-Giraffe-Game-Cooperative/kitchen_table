@@ -100,6 +100,41 @@ if config_env() != :test do
     config :family, calendar_private_hosts: true
   end
 
+  # Linking Google and Outlook calendars both ways needs an app registered
+  # with Google and with Microsoft in the name of whoever runs this server
+  # (docs/calendar-sign-in.md). Their client IDs and secrets can go here, or
+  # an admin can paste them in under Linked calendars instead.
+  clients =
+    for {provider, prefix} <- [{"google", "GOOGLE"}, {"microsoft", "MICROSOFT"}],
+        id = System.get_env("#{prefix}_CLIENT_ID"),
+        secret = System.get_env("#{prefix}_CLIENT_SECRET"),
+        id not in [nil, ""] and secret not in [nil, ""],
+        into: %{},
+        do: {provider, {String.trim(id), String.trim(secret)}}
+
+  if clients != %{}, do: config(:family, connect_clients: clients)
+
+  # Only work or school accounts from one organisation: its tenant ID. The
+  # default, "common", also takes personal Outlook.com and Hotmail accounts.
+  if tenant = System.get_env("MICROSOFT_TENANT") do
+    config :family, microsoft_tenant: tenant
+  end
+
+  # For testing: Google's and Microsoft's sign-in and calendars, played by a
+  # stand-in at this address.
+  if stand_in = System.get_env("CALENDAR_CONNECT_STAND_IN") do
+    base = String.trim_trailing(stand_in, "/")
+
+    config :family,
+      connect_urls: %{
+        google_accounts: base <> "/google-accounts",
+        google_oauth: base <> "/google-oauth",
+        google_api: base <> "/google-api",
+        microsoft_login: base <> "/microsoft-login",
+        microsoft_graph: base <> "/microsoft-graph"
+      }
+  end
+
   # Notifications go to the browsers' push services on the internet.
   # PUSH_PRIVATE_HOSTS=1 also allows ones on this network, for testing.
   if System.get_env("PUSH_PRIVATE_HOSTS") in ["1", "true"] do

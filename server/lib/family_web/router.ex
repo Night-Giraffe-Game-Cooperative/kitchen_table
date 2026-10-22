@@ -78,6 +78,11 @@ defmodule FamilyWeb.Router do
         patch "/calendar/links/:id", CalendarController, :update_link
         post "/calendar/links/:id/sync", CalendarController, :sync_link
         delete "/calendar/links/:id", CalendarController, :unlink
+        get "/calendar/connect", CalendarController, :connect_status
+        put "/calendar/connect/:provider", CalendarController, :connect_setup
+        delete "/calendar/connect/:provider", CalendarController, :connect_clear
+        post "/calendar/connect/:provider/start", CalendarController, :connect_start
+        get "/calendar/accounts/:id/calendars", CalendarController, :account_calendars
 
         get "/tasks", TaskController, :index
         post "/tasks", TaskController, :create
@@ -121,6 +126,8 @@ defmodule FamilyWeb.Router do
     pipe_through :browser
 
     get "/media/:key", MediaController, :show
+    # Google and Microsoft send people back here after signing in.
+    get "/calendar-connect/:provider", CalendarConnectController, :back
     get "/*path", PageController, :index
   end
 end

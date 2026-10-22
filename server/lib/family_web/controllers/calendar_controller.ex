@@ -1,7 +1,8 @@
 defmodule FamilyWeb.CalendarController do
   use FamilyWeb, :controller
   alias Family.Calendar
-  alias Family.Calendar.Links
+  alias Family.Calendar.{Connect, Links}
+  alias FamilyWeb.CalendarConnectController
 
   def index(conn, params) do
     user = conn.assigns.current_user
@@ -68,6 +69,41 @@ defmodule FamilyWeb.CalendarController do
   def unlink(conn, %{"id" => id}) do
     with :ok <- Links.remove(conn.assigns.current_user, String.to_integer(id)), do: json(conn, %{ok: true})
   end
+
+  # Signing in to Google or Microsoft to link their calendars.
+
+  def connect_status(conn, _) do
+    json(conn, %{providers: Connect.status(conn.assigns.current_user, CalendarConnectController.site(conn))})
+  end
+
+  def connect_setup(conn, %{"provider" => provider} = params) do
+    with {:ok, provider} <- provider(provider),
+         :ok <- Connect.setup(conn.assigns.current_user, provider, params),
+         do: connect_status(conn, params)
+  end
+
+  def connect_clear(conn, %{"provider" => provider} = params) do
+    with {:ok, provider} <- provider(provider),
+         :ok <- Connect.clear(conn.assigns.current_user, provider),
+         do: connect_status(conn, params)
+  end
+
+  def connect_start(conn, %{"provider" => provider} = params) do
+    with {:ok, provider} <- provider(provider),
+         {:ok, url} <- Connect.start(conn.assigns.current_user, provider, CalendarConnectController.site(conn), params["account"]),
+         do: json(conn, %{url: url})
+  end
+
+  def account_calendars(conn, %{"id" => id}) do
+    with {:ok, account, calendars} <- Links.account_calendars(conn.assigns.current_user, id) do
+      json(conn, %{
+        account: %{id: account.id, provider: account.provider, email: account.email},
+        calendars: Enum.map(calendars, &Map.take(&1, [:url, :name, :color, :writable]))
+      })
+    end
+  end
+
+  defp provider(provider), do: if(provider in Connect.providers(), do: {:ok, provider}, else: {:error, :not_found})
 
   defp range(%{"from" => from, "to" => to}) do
     with {:ok, from} <- Date.from_iso8601(from),

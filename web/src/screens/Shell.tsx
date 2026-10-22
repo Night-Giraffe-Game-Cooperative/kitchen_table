@@ -109,7 +109,7 @@ export function Shell() {
         )}
         {route.name === 'chats' && <Chats roomId={route.roomId} />}
         {route.name === 'games' && <GamesHub gameId={route.gameId} />}
-        {route.name === 'calendar' && <CalendarScreen view={route.view} />}
+        {route.name === 'calendar' && <CalendarScreen view={route.view} linkAccount={route.linkAccount} />}
         {route.name === 'people' && <People personId={route.personId} />}
         {route.name === 'outbox' && <Outbox />}
         {route.name === 'me' && <MePage />}

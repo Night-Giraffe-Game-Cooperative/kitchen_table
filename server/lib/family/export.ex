@@ -219,7 +219,12 @@ defmodule Family.Export do
   # Someone's own download has their links in full. The family's has only
   # where each one is: a calendar's address can be the key to it.
   defp link(%Link{} = l, :own), do: %{name: l.name, kind: l.provider, address: l.url, username: l.username, shared_with: l.share, last_copied_at: l.last_synced_at}
-  defp link(%Link{} = l, :family), do: %{name: l.name, kind: l.provider, at: URI.parse(l.url).host, shared_with: l.share, last_copied_at: l.last_synced_at}
+  defp link(%Link{} = l, :family), do: %{name: l.name, kind: l.provider, at: link_at(l), shared_with: l.share, last_copied_at: l.last_synced_at}
+
+  # A Google or Outlook calendar's ID is often its owner's email address, so only where it's kept.
+  defp link_at(%Link{provider: "google"}), do: "google.com"
+  defp link_at(%Link{provider: "microsoft"}), do: "outlook.com"
+  defp link_at(%Link{url: url}), do: URI.parse(url).host
 
   defp task(%Task{} = t, names) do
     %{

@@ -78,14 +78,21 @@ defmodule FamilyWeb.Present do
       share: l.share,
       writable: l.writable,
       default: l.default,
-      host: Family.Calendar.DAV.host(l.url),
+      host: link_host(l),
       username: if(mine, do: l.username),
+      # Whoever linked it can sign in to its Google or Microsoft account again.
+      account_id: if(mine, do: l.account_id),
       last_synced_at: l.last_synced_at,
       last_error: l.last_error,
       can_write: Family.Calendar.Links.may_write?(viewer, l),
       can_manage: Family.Calendar.Links.may_manage?(viewer, l)
     }
   end
+
+  # A Google or Outlook calendar's ID is often someone's email address, so the place it's kept is said instead.
+  defp link_host(%Family.Calendar.Link{provider: "google"}), do: "google.com"
+  defp link_host(%Family.Calendar.Link{provider: "microsoft"}), do: "outlook.com"
+  defp link_host(%Family.Calendar.Link{url: url}), do: Family.Calendar.DAV.host(url)
 
   def task(%Family.Tasks.Task{} = t) do
     %{

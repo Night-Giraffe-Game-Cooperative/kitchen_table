@@ -3,14 +3,17 @@ defmodule Family.Calendar.Link do
   import Ecto.Changeset
 
   # caldav: read and written (iCloud, Fastmail, Nextcloud...).
+  # google and microsoft: read and written, through a signed-in account.
   # ics: a calendar's address, read only (Google's or Outlook's secret
   # address, a school's or a club's).
-  @providers ~w(caldav ics)
+  @providers ~w(caldav google microsoft ics)
   # Everyone who sees the family calendar, or only whoever linked it.
   @shares ~w(family me)
 
   schema "calendar_links" do
     belongs_to :user, Family.Accounts.User
+    # The Google or Microsoft account it's reached through.
+    belongs_to :account, Family.Calendar.Account
     field :provider, :string
     field :name, :string
     field :url, :string
@@ -32,7 +35,7 @@ defmodule Family.Calendar.Link do
 
   def new_changeset(link, attrs) do
     link
-    |> cast(attrs, [:user_id, :provider, :name, :url, :username, :secret, :share, :color, :writable, :default])
+    |> cast(attrs, [:user_id, :account_id, :provider, :name, :url, :username, :secret, :share, :color, :writable, :default])
     |> validate_required([:user_id, :provider, :url])
     |> validate_inclusion(:provider, @providers)
     |> settings()

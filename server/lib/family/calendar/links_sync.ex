@@ -1,8 +1,10 @@
 defmodule Family.Calendar.Links.Sync do
   @moduledoc """
-  Copies linked calendars here: CalDAV ones every five minutes (it's quick to
-  ask whether anything changed), feeds every hour. One copy runs at a time,
-  so a link is never copied twice at once.
+  Copies linked calendars here: CalDAV and Google ones every five minutes
+  (it's quick to ask whether anything changed), Outlook ones every ten (they
+  come in full each time), feeds every hour. One copy runs at a time, so a
+  link is never copied twice at once. Now and then it also lets go of Google
+  and Microsoft accounts someone signed in to but linked nothing from.
   """
 
   use GenServer
@@ -27,7 +29,7 @@ defmodule Family.Calendar.Links.Sync do
   @impl true
   def init(_) do
     if ticking?(), do: Process.send_after(self(), :tick, :timer.seconds(20))
-    {:ok, nil}
+    {:ok, %{tidied: nil}}
   end
 
   @impl true
@@ -59,7 +61,13 @@ defmodule Family.Calendar.Links.Sync do
 
     if due, do: Links.pull(due, [])
     Process.send_after(self(), :tick, if(due, do: 1000, else: @tick))
-    {:noreply, state}
+
+    if is_nil(state.tidied) or DateTime.diff(now, state.tidied) >= 3600 do
+      Family.Calendar.Connect.tidy()
+      {:noreply, %{state | tidied: now}}
+    else
+      {:noreply, state}
+    end
   rescue
     e ->
       Logger.error("Calendar copying failed: " <> Exception.message(e))
@@ -73,7 +81,8 @@ defmodule Family.Calendar.Links.Sync do
     every =
       case {link.provider, link.last_error} do
         {_, error} when is_binary(error) -> 30
-        {"caldav", _} -> 5
+        {provider, _} when provider in ["caldav", "google"] -> 5
+        {"microsoft", _} -> 10
         _ -> 60
       end
 

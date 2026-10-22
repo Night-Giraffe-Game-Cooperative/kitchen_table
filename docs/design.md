@@ -415,3 +415,21 @@ questions, but once answering starts it only waits on (and only shows "Your
 turn" to) the people who wrote some. A game that goes wrong on one device now
 shows a reload button instead of blanking the app, and chess games keep a
 computer level older copies of the app understand.
+
+**22 Oct 2026. Google and Outlook calendars both ways.** Google's and
+Outlook's calendars could only be shown from their secret addresses, because
+writing to them needs signing in with OAuth, and that needs the app
+registered with each in the name of whoever runs it. An admin now pastes the
+registered app's client ID and secret into Linked calendars (or the server
+is started with them), and then anyone who can change the calendar signs in
+and picks calendars, as with iCloud. Google's and Microsoft's own APIs are
+used rather than Google's CalDAV, which needs full access to every calendar,
+and Microsoft has none: both work out repeating events into occurrences, so
+they fit the rows linked calendars already keep, and repeating events are
+still changed where they live. The scopes asked for are the narrowest that
+work: events, and the list of calendars. Tokens are sealed like CalDAV
+passwords; Microsoft's refresh token changes each time it's used, so the new
+one is kept. Signing in comes back to the browser that started it and checks
+it's the same person, so nobody can attach their own Google account to
+someone else's Kitchen Table. An account nobody links a calendar from is
+let go after an hour, and Google is told to forget it.

@@ -209,10 +209,12 @@ handing it in on time can earn a reward like any task. Grown-ups see their
 kids' homework in one place.
 
 **Linked calendars.** Calendars the family already uses show in the family
-calendar, each in its own colour. iCloud and other CalDAV calendars (Fastmail,
-Nextcloud, Zoho, Yahoo and the like) go both ways: add an event here and it's
-on everyone's phones, change one on a phone and it changes here. A calendar's
-address (Google's or Outlook's secret iCal address, a school's or a club's) is
+calendar, each in its own colour. Google, Outlook, iCloud and other CalDAV
+calendars (Fastmail, Nextcloud, Zoho, Yahoo and the like) go both ways: add
+an event here and it's on everyone's phones, change one on a phone and it
+changes here. Google and Outlook need signing in, once Kitchen Table is
+registered with them ([how](docs/calendar-sign-in.md)). A calendar's address
+(a school's or a club's, or Google's or Outlook's secret iCal address) is
 shown here and changed where it's kept. Whoever links a calendar chooses
 whether the family sees it or only they do. See
 [Linked calendars](docs/getting-started.md#7-linked-calendars) in the guide.
@@ -263,6 +265,9 @@ in `/etc/kitchen-table.env` on the server).
 | `TURN_URL`, `TURN_USERNAME`, `TURN_PASSWORD` | A relay for video calls between different networks (the server setup makes one). |
 | `PUSH_CONTACT` | A `mailto:` or `https:` address for push services to reach whoever runs the server. |
 | `CALENDAR_PRIVATE_HOSTS=1` | Allow linking calendars on the home network. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | The apps registered with Google and Microsoft, so Google and Outlook calendars link both ways. An admin can paste these into the app instead: see [docs/calendar-sign-in.md](docs/calendar-sign-in.md). |
+| `MICROSOFT_TENANT` | Keep Microsoft sign-ins to one organisation's accounts. Personal and work accounts both work unless set. |
+| `CALENDAR_CONNECT_STAND_IN` | For testing only: send Google and Microsoft sign-ins and calendars to a stand-in at this address. |
 | `PUSH_PRIVATE_HOSTS=1` | Allow push addresses on the home network, for testing only. |
 | `MOVED_TO` | Send every page to a new address, after moving the family online. |
 | `SECRET_KEY_BASE` | The key that signs sign-ins and seals passwords. Made once and kept in the data folder unless set. |
@@ -295,9 +300,10 @@ docs/     the getting going guide, and design notes with the decision log
   moustache stays under the same nose on every screen.
 - **Who may talk to whom** is one module, `Family.Contacts`, checked for every
   chat, group, message, game and call.
-- **Calendars and notifications** use open standards and nothing else: CalDAV
-  and iCalendar for linked calendars, Web Push (RFC 8291 and 8292) on the
-  standard library's crypto for notifications.
+- **Calendars and notifications** use open standards where there are any:
+  CalDAV and iCalendar for linked calendars, Web Push (RFC 8291 and 8292) on
+  the standard library's crypto for notifications. Google and Outlook
+  calendars go through their own APIs, after signing in with OAuth.
 
 [docs/design.md](docs/design.md) explains the look and keeps a log of the
 decisions and why they were made.
@@ -318,7 +324,9 @@ decisions and why they were made.
   a kid, on a phone and a tablet, light and dark, that the keyboard reaches
   everything, and that nothing runs off a small phone with large text. Start
   the server on an empty data folder with `CALENDAR_PRIVATE_HOSTS=1
-  PUSH_PRIVATE_HOSTS=1` first; screenshots land in `web/e2e/shots`.
+  PUSH_PRIVATE_HOSTS=1 CALENDAR_CONNECT_STAND_IN=http://127.0.0.1:4190`
+  first (the tests play Google and Microsoft on that port); screenshots land
+  in `web/e2e/shots`.
 - `python3 scripts/make_art.py` redraws the paper textures and icons.
 - Machines that can't reach hex.pm can set `FAMILY_GIT_DEPS=1` to fetch the
   same package versions from GitHub (locked in `server/mix.git.lock`).
