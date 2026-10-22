@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { api } from '../../lib/api';
 import { confirmFirst } from '../../components/confirm';
-import { preparePhoto, upload } from '../../lib/image';
-import type { Game, Media, Message } from '../../lib/types';
-import { Button, Spinner } from '../../components/ui';
-import { Icon } from '../../components/icons';
+import type { Game, Media } from '../../lib/types';
+import { Button } from '../../components/ui';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, playerSeats, seatOf, seatOrder, startGame } from '../common';
 import { bandOf, type Band } from '../bands';
+import { PhotoPicker, chosenPicture } from '../photos';
 import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
 import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers, winnerText, type Standing } from '../word-garden/Players';
 import {
@@ -50,14 +48,16 @@ const sizeFor: Record<Band, number> = { '5-7': 3, '8-10': 4, '11-13': 5, '14+': 
 /**
  * The clues a puzzle gives. The youngest see the finished picture all the
  * time and the right space lights up when they pick up a piece; 14 and up
- * get no peeking. Learn mode shows the picture and allows a peek at any age,
- * and lights up the right space when puzzling together.
+ * get no peeking. Learn mode shows the picture and allows a peek at any age
+ * when puzzling together, but not in a race, where it's switched on for one
+ * device and would help only that player.
  */
 function cluesFor(band: Band, learn: boolean, race: boolean) {
+  const help = learn && !race;
   return {
-    guide: band === '5-7' || learn,
-    home: band === '5-7' || (learn && !race),
-    peek: band !== '14+' || learn,
+    guide: band === '5-7' || help,
+    home: band === '5-7' || help,
+    peek: band !== '14+' || help,
   };
 }
 
@@ -451,35 +451,6 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
 }
 
 function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
-  const [photos, setPhotos] = useState<Media[] | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    api
-      .get<{ messages: Message[] }>(`/api/rooms/${room.id}/messages`)
-      .then((res) => {
-        const seen = new Set<string>();
-        const list = res.messages
-          .filter((m) => m.media && !m.deleted)
-          .map((m) => m.media!)
-          .reverse()
-          .filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)))
-          .slice(0, 12);
-        setPhotos(list);
-      })
-      .catch(() => setPhotos([]));
-    // Once per room.
-  }, [room.id]);
-
-  // The latest photo, until one is chosen. Again after the options are reset,
-  // as they are when switching between together and against each other.
-  useEffect(() => {
-    if (photos?.[0] && !value.media && !value.file) onChange({ ...value, media: photos[0] });
-  }, [photos, value.media, value.file]);
-
-  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
-
   return (
     <>
       {mode === 'versus' && (
@@ -491,49 +462,7 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
           <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={6} race />
         </>
       )}
-      <fieldset className="fieldset">
-        <legend>Picture</legend>
-        {!photos ? (
-          <Spinner label="Finding photos" />
-        ) : (
-          <div className="photo-pick">
-            {preview && (
-              <button type="button" className="photo-option" aria-pressed={!!value.file}>
-                <img src={preview} alt="Your new photo" />
-              </button>
-            )}
-            {photos.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                className="photo-option"
-                aria-pressed={!value.file && value.media?.key === m.key}
-                onClick={() => onChange({ ...value, media: m, file: null })}
-              >
-                <img src={m.url} alt="" />
-              </button>
-            ))}
-            <button type="button" className="photo-option photo-add" onClick={() => input.current?.click()}>
-              <Icon name="camera" size={26} />
-              <span>New photo</span>
-            </button>
-            <input
-              ref={input}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                setPreview(URL.createObjectURL(file));
-                onChange({ ...value, file, media: null });
-              }}
-            />
-          </div>
-        )}
-        {photos && photos.length === 0 && !preview && <p className="muted">No photos in this chat yet. Add a new one.</p>}
-      </fieldset>
+      <PhotoPicker roomId={room.id} value={value} onChange={(c) => onChange({ ...value, ...c })} />
     </>
   );
 }
@@ -550,13 +479,7 @@ export const picturePuzzle: GameDef<State, Options> = {
   ready: (o) => !!(o.media || o.file) && (o.mode !== 'versus' || o.players.length > 0),
   Options,
   create: async (o, { room, me, mode, band }) => {
-    let media = o.media;
-    if (o.file) {
-      const prepared = await preparePhoto(o.file);
-      media = (await upload(room.id, prepared)).media;
-    }
-    if (!media) throw new Error('Choose a picture first.');
-    const picture = { url: media.url, width: media.width ?? 1000, height: media.height ?? 1000 };
+    const picture = await chosenPicture(o, room.id);
     const size = sizeFor[band];
     if (mode === 'versus') {
       return { mode, seats: playerSeats([me.id, ...o.players]), state: newRace(picture, size) };

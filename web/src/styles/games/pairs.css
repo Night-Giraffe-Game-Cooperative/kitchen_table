@@ -1,0 +1,265 @@
+/*
+ * Pairs: cards laid out on a wooden tray. Each card has a Night Giraffe back
+ * (giraffe patches in warm browns, with his moon in the middle) and flips over
+ * to show a picture on cream paper. A match pops and takes on the finder's
+ * colour; a miss gives a little wobble.
+ */
+
+.pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.pairs-news {
+  margin: -0.35rem 0 0;
+  min-height: 1.45em;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+/* ---------- The first look, for the youngest ---------- */
+
+.pairs-look.sheet {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem 0.65rem;
+  overflow: hidden;
+  background-color: var(--sunflower-tint);
+}
+
+.pairs-look p {
+  flex: 1;
+  margin: 0;
+  font-weight: 750;
+}
+
+.pairs-look-art {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.pairs-look-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--sunflower);
+  transform-origin: left;
+  animation: pairs-shrink 3s linear forwards;
+}
+
+@keyframes pairs-shrink {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ---------- The tray ---------- */
+
+/* Wide enough for the columns, but never so tall that the bottom row falls off the screen. */
+.pairs-table {
+  --gap: clamp(0.3rem, 1.4vw, 0.6rem);
+  width: min(100%, 44rem, calc(62dvh * var(--cols) / var(--rows) * 0.8));
+  margin: 0 auto;
+  padding: clamp(0.45rem, 1.8vw, 0.8rem);
+  border-radius: var(--radius-lg);
+  background:
+    repeating-linear-gradient(97deg, rgb(255 255 255 / 0.05) 0 2px, transparent 2px 11px),
+    linear-gradient(135deg, #9c7652, #6e4e31);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.16),
+    inset 0 -2px 0 rgb(0 0 0 / 0.22),
+    var(--shadow-lift);
+}
+
+.pairs-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+/* ---------- A card ---------- */
+
+.pairs-card {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  perspective: 700px;
+  container-type: inline-size;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pairs-card[aria-disabled='true'] {
+  cursor: default;
+}
+
+.pairs-card:focus-visible {
+  outline: 3px solid #fffaf0;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 6px var(--focus);
+}
+
+.pairs-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.3, 0.1, 0.2, 1);
+}
+
+.pairs-card[data-up] .pairs-inner {
+  transform: rotateY(180deg);
+}
+
+.pairs-card:not([data-up], [aria-disabled='true']):hover .pairs-inner {
+  transform: translateY(-3px);
+}
+
+.pairs-back,
+.pairs-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  box-shadow:
+    0 2px 0 rgb(55 32 14 / 0.4),
+    0 5px 10px -5px rgb(30 15 5 / 0.55);
+}
+
+/* The Night Giraffe's patches, with his moon in the middle and a cream paper edge. */
+.pairs-back {
+  border: clamp(2px, 5cqi, 4px) solid #fbf3df;
+  background-color: #f1d39c;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cmask id='m'%3E%3Crect width='40' height='40' fill='white'/%3E%3Ccircle cx='24.5' cy='16' r='7.5' fill='black'/%3E%3C/mask%3E%3Ccircle cx='20' cy='20' r='16' fill='%2326304d' stroke='%23fbf3df' stroke-width='2.5'/%3E%3Ccircle cx='19' cy='21' r='9' fill='%23f6d98b' mask='url(%23m)'/%3E%3Ccircle cx='28.5' cy='12.5' r='1.4' fill='%23fbf3df'/%3E%3Ccircle cx='11' cy='12.5' r='1' fill='%23fbf3df'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' fill='%23f1d39c'/%3E%3Cpath fill='%23a65f2a' stroke='%23a65f2a' stroke-width='3' stroke-linejoin='round' d='M30 4L32 -7L33 -9L44 -5L43 5L32 6ZM30 76L32 65L33 63L44 67L43 77L32 78ZM22 11L26 9L29 11L31 24L25 28L18 25ZM-16 21L-15 15L-11 13L-4 14L-2 21L-10 26ZM56 21L57 15L61 13L68 14L70 21L62 26ZM50 41L47 29L52 26L59 32L60 39L50 42ZM5 63L-1 59L1 48L4 47L10 50L13 57ZM77 63L71 59L73 48L76 47L82 50L85 57Z'/%3E%3Cpath fill='%238e4c20' stroke='%238e4c20' stroke-width='3' stroke-linejoin='round' d='M10 2L9 -3L17 -10L25 -7L24 3L19 5ZM10 74L9 69L17 62L25 65L24 75L19 77ZM58 -6L58 7L54 9L50 6L50 -5L54 -7ZM58 66L58 79L54 81L50 78L50 67L54 65Z'/%3E%3Cpath fill='%23b4692f' stroke='%23b4692f' stroke-width='3' stroke-linejoin='round' d='M-8 7L-8 -7L-4 -9L3 -3L4 3L-3 8ZM-8 79L-8 65L-4 63L3 69L4 75L-3 80ZM64 7L64 -7L68 -9L75 -3L76 3L69 8ZM64 79L64 65L68 63L75 69L76 75L69 80ZM2 12L8 7L15 10L12 24L10 24L4 21ZM74 12L80 7L87 10L84 24L82 24L76 21ZM35 12L46 10L51 14L49 20L43 25L37 23ZM-6 40L-7 32L2 26L6 29L2 42L-1 43ZM66 40L65 32L74 26L78 29L74 42L71 43ZM12 30L14 30L23 34L23 39L13 45L8 42ZM36 45L29 39L29 33L35 29L41 30L43 42ZM30 58L28 60L19 56L17 50L26 44L32 50ZM50 60L47 62L36 58L38 51L47 47L47 47ZM65 58L60 60L56 59L54 47L63 45L67 48Z'/%3E%3C/svg%3E");
+  background-position:
+    center,
+    0 0;
+  background-size:
+    46% auto,
+    72% auto;
+  background-repeat: no-repeat, repeat;
+}
+
+/* A card that has been turned over before: a little eye in the corner. */
+.pairs-seen {
+  position: absolute;
+  top: 5%;
+  right: 5%;
+  width: max(0.95rem, 30cqi);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fffaf0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z' fill='none' stroke='%2326304d' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='12' cy='12' r='3.2' fill='%2326304d'/%3E%3C/svg%3E") center / 74% no-repeat;
+  box-shadow:
+    0 0 0 1.5px #26304d,
+    0 1px 3px rgb(0 0 0 / 0.35);
+}
+
+.pairs-face {
+  display: grid;
+  place-items: center;
+  transform: rotateY(180deg);
+  background-color: #fffaf0;
+  border: 2px solid #eadfc8;
+  overflow: hidden;
+}
+
+.pairs-emoji {
+  font-size: 2rem;
+  font-size: 56cqi;
+  line-height: 1;
+}
+
+.pairs-photo {
+  border: clamp(2px, 4cqi, 4px) solid #fffaf0;
+  background-color: #d9cfbd;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* Cream paper glows on a dark table, so it's toned down a little. */
+:root[data-scheme='dark'] .pairs-face {
+  background-color: #efe5cf;
+  border-color: #d6c8aa;
+}
+
+:root[data-scheme='dark'] .pairs-photo {
+  border-color: #efe5cf;
+}
+
+/* Found: the card takes on the colour of whoever found it. */
+.pairs-card[data-found] .pairs-face {
+  border-color: var(--ink-c);
+  box-shadow:
+    0 0 0 2px var(--ink-c),
+    0 2px 0 rgb(55 32 14 / 0.4);
+}
+
+.pairs-card[data-pop] {
+  animation: pairs-pop 520ms var(--ease) 380ms both;
+}
+
+.pairs-card[data-miss] {
+  animation: pairs-wobble 560ms ease-in-out 420ms both;
+}
+
+@keyframes pairs-pop {
+  0%,
+  100% {
+    transform: none;
+  }
+  45% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes pairs-wobble {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: rotate(-6deg);
+  }
+  40% {
+    transform: rotate(5deg);
+  }
+  60% {
+    transform: rotate(-3deg);
+  }
+  80% {
+    transform: rotate(2deg);
+  }
+}
+
+/* ---------- Choosing the pictures ---------- */
+
+.pairs-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.pairs-strip img {
+  width: 2.6rem;
+  height: 2.6rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--divider);
+}

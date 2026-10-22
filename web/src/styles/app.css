@@ -2246,6 +2246,16 @@ button {
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
 }
 
+.game-shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.game-shelf .section-label {
+  margin: 0 0 0.5rem;
+}
+
 .game-pick {
   display: flex;
   gap: 0.875rem;
@@ -2467,8 +2477,10 @@ button {
 
 .wg-sky {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.35rem;
-  font-size: 1.6rem;
+  font-size: clamp(1.25rem, 6vw, 1.6rem);
   padding: 0.5rem 1rem;
   border-radius: var(--radius-full);
   background: linear-gradient(180deg, var(--sky-tint), transparent);
@@ -3192,7 +3204,6 @@ button {
 
 /* ---------- Learning the games ---------- */
 
-/* A tip: a small yellow paper note pinned under the board. */
 /* What a button does, on hover, focus or press-and-hold (components/tips.tsx). */
 .tip-bubble {
   position: fixed;
@@ -3269,6 +3280,7 @@ button {
   -webkit-touch-callout: none;
 }
 
+/* A tip: a small yellow paper note pinned under the board. */
 .tip-note {
   display: flex;
   align-items: flex-start;

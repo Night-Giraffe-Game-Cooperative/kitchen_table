@@ -625,7 +625,7 @@ export const wordGarden: GameDef<State, Options> = {
     return { mode, seats, state: newVersus(words, order, { band, pick: o.category }) };
   },
   bands: {
-    '5-7': 'Short everyday words, the picture from the start, the first letter filled in and 9 suns.',
+    '5-7': 'Short everyday words, the picture from the start and 9 suns. Playing together, the first letter is filled in.',
     '8-10': 'Everyday words of four to six letters, the picture after a couple of letters and 8 suns.',
     '11-13': 'Longer words, some harder, the picture once half the word is found and 7 suns.',
     '14+': 'The hardest and longest words, only the clue and 6 suns.',

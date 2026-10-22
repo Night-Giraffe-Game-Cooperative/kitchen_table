@@ -132,4 +132,30 @@ defmodule Family.ChatGamesTest do
     assert {:error, "That game isn't available."} =
              Games.create(kid, room.id, %{"type" => "doodle_together", "mode" => "versus", "seats" => %{}, "state" => %{}})
   end
+
+  test "the newer games: a computer seat never moves, so its reply comes with the person's move", %{kid: kid, grownup: grownup, room: room} do
+    for {type, modes} <- [
+          {"pairs", ~w(coop versus)},
+          {"four_in_a_row", ~w(coop versus)},
+          {"wheres_giraffe", ~w(coop)},
+          {"dots_boxes", ~w(coop versus)},
+          {"family_quiz", ~w(coop)},
+          {"snakes_ladders", ~w(coop versus)}
+        ] do
+      assert Games.types()[type] == modes
+    end
+
+    {:ok, game} =
+      Games.create(kid, room.id, %{
+        "type" => "four_in_a_row",
+        "mode" => "coop",
+        "seats" => %{"red" => "team", "yellow" => "computer"},
+        "state" => %{"turn" => "red", "moves" => []}
+      })
+
+    assert {:ok, game} = Games.move(grownup, game.id, %{"version" => 0, "state" => %{"turn" => "red", "moves" => [3, 4]}})
+    assert {:ok, game} = Games.move(kid, game.id, %{"version" => 1, "state" => %{"turn" => "yellow", "moves" => [3, 4, 2]}})
+    assert {:error, "It isn't your turn."} = Games.move(kid, game.id, %{"version" => 2, "state" => %{"turn" => "red"}})
+    assert {:error, "That game isn't available."} = Games.create(kid, room.id, %{"type" => "family_quiz", "mode" => "versus", "seats" => %{}, "state" => %{}})
+  end
 end

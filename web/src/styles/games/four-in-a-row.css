@@ -1,0 +1,326 @@
+/*
+ * Four in a Row: a deep blue frame in a wooden rim, with round holes the
+ * counters fall behind. Red counters carry a ring and yellow ones a dot, so
+ * they tell apart without colour.
+ */
+
+.fiar {
+  --fiar-wood: #6d4a2c;
+  --fiar-wood-light: #8b6440;
+  --fiar-wood-edge: #4f341e;
+  --fiar-panel: #1f54a3;
+  --fiar-back: #0f2a55;
+  --fiar-red: #d2382a;
+  --fiar-red-light: #f0705c;
+  --fiar-red-rim: #8a1c13;
+  --fiar-yellow: #f2bd1d;
+  --fiar-yellow-light: #ffe58a;
+  --fiar-yellow-rim: #a17300;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+:root[data-scheme='dark'] .fiar {
+  --fiar-panel: #1b4a90;
+  --fiar-back: #0a1f40;
+}
+
+.fiar-players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.75rem;
+}
+
+.fiar-colour {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.fiar-last {
+  min-height: 1.3rem;
+  margin: -0.3rem 0 0;
+  font-size: var(--text-sm);
+}
+
+/* The board fits the screen: no wider than the room left below the status and players. */
+.fiar-board {
+  width: min(100%, 34rem, max(18rem, calc(58dvh * 7 / 6)));
+  margin: 0 auto;
+}
+
+.fiar-markers {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  min-height: 1.9rem;
+  padding: 0 calc(0.45rem + 0.5rem);
+  font-size: 1.35rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.fiar-marker[data-kind] {
+  animation: fiar-bob 1.6s ease-in-out infinite;
+}
+
+@keyframes fiar-bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.fiar-frame {
+  padding: 0.5rem;
+  background: var(--fiar-panel);
+  border: 0.45rem solid var(--fiar-wood);
+  border-radius: 0.9rem;
+  box-shadow:
+    inset 0 0 0 2px var(--fiar-wood-light),
+    0 3px 0 var(--fiar-wood-edge),
+    var(--shadow-lift);
+}
+
+.fiar-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  aspect-ratio: 7 / 6;
+  overflow: hidden;
+  border-radius: 0.3rem;
+  background: var(--fiar-back);
+  user-select: none;
+}
+
+/* Each column is one tall button; the counters inside sit behind the frame's front. */
+.fiar-col {
+  position: relative;
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--motion) var(--ease);
+}
+
+.fiar-col[data-can] {
+  cursor: pointer;
+}
+
+.fiar-col[data-can]:focus-visible {
+  background: rgb(255 255 255 / 0.12);
+}
+
+@media (hover: hover) {
+  .fiar-col[data-can]:hover {
+    background: rgb(255 255 255 / 0.12);
+  }
+
+  .fiar-col[data-can]:hover .fiar-ghost {
+    opacity: 0.5;
+  }
+}
+
+.fiar-col[data-hint] {
+  background: rgb(255 214 90 / 0.35);
+}
+
+/* The app's outline would hide behind the frame, so the ring is drawn in front of it. */
+.fiar-col:focus-visible {
+  outline: none;
+}
+
+.fiar-col:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 4;
+  border: 3px solid #fff;
+  border-radius: 0.5rem;
+  box-shadow:
+    0 0 0 2px #0b1d3d,
+    inset 0 0 0 2px #0b1d3d;
+  pointer-events: none;
+}
+
+.fiar-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.fiar-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: fiar-drop calc(200ms + var(--fall) * 65ms) both;
+}
+
+.fiar-drop[data-still] {
+  animation: none;
+}
+
+@keyframes fiar-drop {
+  0% {
+    transform: translateY(calc(var(--fall) * -100%));
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  78% {
+    transform: translateY(0);
+    animation-timing-function: ease-out;
+  }
+  89% {
+    transform: translateY(-8%);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.fiar-disc {
+  --fill: var(--fiar-red);
+  --light: var(--fiar-red-light);
+  --rim: var(--fiar-red-rim);
+  position: relative;
+  display: block;
+  width: 72%;
+  aspect-ratio: 1;
+  border: 3px solid var(--rim);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--light), var(--fill) 58%);
+  box-shadow:
+    inset 0 -3px 0 rgb(0 0 0 / 0.18),
+    inset 0 2px 0 rgb(255 255 255 / 0.25);
+}
+
+.fiar-disc[data-disc='yellow'] {
+  --fill: var(--fiar-yellow);
+  --light: var(--fiar-yellow-light);
+  --rim: var(--fiar-yellow-rim);
+}
+
+/* A raised ring on red, a dot on yellow. */
+.fiar-disc::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+
+.fiar-disc[data-disc='red']::after {
+  inset: 16%;
+  background: radial-gradient(circle closest-side, transparent 60%, rgb(255 236 230 / 0.75) 64%, rgb(255 236 230 / 0.75) 90%, transparent 95%);
+}
+
+.fiar-disc[data-disc='yellow']::after {
+  inset: 34%;
+  background: var(--fiar-yellow-rim);
+  box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.25);
+}
+
+.fiar-ghost {
+  opacity: 0;
+  transition: opacity var(--motion) var(--ease);
+}
+
+.fiar-col[data-can]:focus-visible .fiar-ghost {
+  opacity: 0.5;
+}
+
+.fiar-disc[data-last] {
+  box-shadow:
+    inset 0 -3px 0 rgb(0 0 0 / 0.18),
+    inset 0 2px 0 rgb(255 255 255 / 0.25),
+    0 0 0 3px rgb(255 255 255 / 0.85);
+}
+
+/* At the end, the four stand out and the rest step back. */
+.fiar-board[data-won] .fiar-disc:not([data-win]) {
+  filter: saturate(0.5) brightness(0.75);
+}
+
+.fiar-disc[data-win] {
+  animation: fiar-win 0.7s ease-in-out 0.4s 4 alternate;
+}
+
+@keyframes fiar-win {
+  to {
+    transform: scale(1.1);
+  }
+}
+
+/* The front of the frame: panel colour with a round hole over every space. */
+.fiar-front {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image: radial-gradient(circle closest-side, transparent 80%, rgb(0 0 0 / 0.4) 82%, var(--fiar-panel) 88%);
+  background-size: calc(100% / 7) calc(100% / 6);
+}
+
+.fiar-line {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.fiar-line line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fiar-line 600ms var(--ease) 350ms forwards;
+}
+
+.fiar-line-edge {
+  stroke: #0b1d3d;
+  stroke-width: 0.24;
+}
+
+.fiar-line-mark {
+  stroke: #fff;
+  stroke-width: 0.14;
+}
+
+@keyframes fiar-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.fiar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.fiar-chip {
+  flex: none;
+  width: 1.35rem;
+  border-width: 2px;
+}
+
+.fiar-next {
+  margin: 0;
+  font-size: var(--text-sm);
+}

@@ -1246,7 +1246,7 @@ function TaskDialog({ edit, onClose }: { edit: TaskEdit; onClose: () => void }) 
   async function save(ev: FormEvent) {
     ev.preventDefault();
     setError(null);
-    if (!title.trim()) return setError(kind === 'reminder' ? 'Say what they need.' : 'Give it a name.');
+    if (!title.trim()) return setError(kind === 'reminder' ? (me.role === 'kid' ? 'Say what you need.' : 'Say what they need.') : 'Give it a name.');
     if (who.length === 0) return setError(kind === 'job' ? 'Choose who does it.' : "Choose who it's for.");
     if (kind !== 'homework' && preset === 'some' && days.length === 0) return setError('Choose at least one day.');
     if (kind === 'homework' && dueOn < onDate) return setError("It can't be due before it's set.");

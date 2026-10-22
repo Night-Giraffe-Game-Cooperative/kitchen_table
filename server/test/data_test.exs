@@ -72,6 +72,18 @@ defmodule Family.DataTest do
     refute everything =~ "password_hash"
   end
 
+  test "a kid's download has only the reminders they set, even after a grown-up who set one leaves", %{admin: admin, kid: kid} do
+    remind = %{"kind" => "reminder", "user_ids" => [kid.id], "days" => [1, 2, 3, 4, 5]}
+    {:ok, _} = Tasks.create(kid, Map.put(remind, "title", "Library book"))
+    {:ok, forms} = Tasks.create(admin, Map.put(remind, "title", "Bring the forms"))
+    {:ok, _} = Tasks.create(admin, Map.put(remind, "title", "Swimming bag"))
+    # What happens to the reminders of a grown-up whose account is removed.
+    Repo.update_all(from(t in Task, where: t.id == ^forms.id), set: [created_by_id: nil])
+
+    titles = signed_in("Mia") |> get("/api/export/me") |> unzip() |> Map.fetch!("tasks.json") |> Jason.decode!() |> Map.fetch!("tasks") |> Enum.map(& &1["title"])
+    assert titles == ["Library book"]
+  end
+
   test "an admin downloads the whole family, without anyone's private calendars", %{admin: admin, lucy: lucy, room: room} do
     {:ok, _} = Chat.post_message(lucy, room.id, %{"body" => "Back at six"})
     {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Tea's ready"})

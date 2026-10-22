@@ -128,7 +128,7 @@ people.
 for its next move as long as it needs to, and the app says when it's your
 turn. Most start as the family playing together, and most can also be played
 against each other. Every game has a How to play page (the book button), and
-chess and backgammon explain themselves as you play: picking up a piece says
+the games explain themselves as you play: picking up a piece says
 how it moves, special rules are explained when they come up, and a chess hint
 says why the move is good. Each tip shows a few times on a device and then
 stops, and How to play can switch them off. Pressing and holding a game in the
@@ -146,16 +146,27 @@ side's chess and backgammon moves, a warning before a piece is left to be
 taken, letters read aloud, the shape of a story. It's remembered for each game
 on each device.
 
+The New game list puts the games on three shelves.
+
 | Game | How it's played |
 | --- | --- |
+| **Drawing and stories** | |
 | Doodle Together | One big page everyone draws on at the same time, live |
+| Doodle Telephone | Words become a drawing, the drawing becomes a guess, and on |
+| Story Chain | Write a story one line each, then read it aloud; against each other, everyone stars their favourite lines |
+| Doodle Battle | Everyone draws the same thing in secret, then gives stars |
+| **Puzzles, memory and quizzes** | |
 | Word Garden | Find the hidden word together, a letter at a time, or take turns and grow the most flowers |
 | Picture Puzzle | A family photo cut into pieces; everyone swaps pieces back, or race on the same jumble (fewest swaps wins) |
-| Story Chain | Write a story one line each, then read it aloud; against each other, everyone stars their favourite lines |
-| Doodle Telephone | Words become a drawing, the drawing becomes a guess, and on |
+| Pairs | Turn over two cards to find a pair, with cards made from the family's photos (or animals or treats); together in as few turns as you can, or taking turns |
+| Where's the Giraffe? | Someone hides the Night Giraffe in a family photo and everyone else taps to find him, with warmer and colder clues for younger ages |
+| Family Quiz | Everyone writes questions about themselves, then answers everyone else's in their own time; the youngest can make a question with taps alone |
+| **Board games** | |
+| Snakes and Ladders | Against each other, or the family against the Night Giraffe, on a smaller board for the youngest |
+| Four in a Row | Against a computer (its strength set by age), as the family or just you, or each other |
+| Dots and Boxes | Draw lines and claim boxes, against the computer or up to four players; the board grows with age |
 | Chess | Against a friendly computer (its strength set by age), as the whole family or just you, or each other |
 | Backgammon | The same: the computer, as the family or just you, or each other |
-| Doodle Battle | Everyone draws the same thing in secret, then gives stars |
 
 **Calendar and tasks.** A family calendar with Today, Month, Week, Homework
 and Rewards views. Events can be all day or timed, run over several days,

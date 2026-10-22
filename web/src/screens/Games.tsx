@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
 import { whoCanChange } from '../lib/permissions';
 import { api } from '../lib/api';
@@ -7,7 +7,7 @@ import { ago } from '../lib/time';
 import type { Game, Me } from '../lib/types';
 import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Notice, Segmented, Select, Spinner } from '../components/ui';
 import { Icon } from '../components/icons';
-import { gameDefs, gameDef, gameStatusLine, isMyTurn } from '../games/registry';
+import { gameDefs, gameDef, gameShelves, gameStatusLine, isMyTurn } from '../games/registry';
 import { useGame } from '../games/useGame';
 import { Basics, HowToPlay, LearnToggle, useLearn } from '../games/learn';
 import { BANDS, bandLabel, defaultBand, rememberBand, type Band } from '../games/bands';
@@ -22,7 +22,8 @@ export function GamesHub({ gameId }: { gameId?: number }) {
 
 function GameList() {
   const { games, me, rooms } = useStore();
-  const [creating, setCreating] = useState(false);
+  // The New game dialog: closed, open at the list, or open at one game picked from the shelf.
+  const [creating, setCreating] = useState<false | { type?: string }>(false);
   const mine = games.filter((g) => isMyTurn(g, me.id));
   const playing = games.filter((g) => g.status === 'active' && !isMyTurn(g, me.id));
   const finished = games.filter((g) => g.status === 'finished');
@@ -33,7 +34,7 @@ function GameList() {
       <header className="page-head">
         <h1>Games</h1>
         {canStart && rooms.length > 0 && (
-          <Button icon="plus" variant="primary" size="sm" onClick={() => setCreating(true)}>
+          <Button icon="plus" variant="primary" size="sm" onClick={() => setCreating({})}>
             New game
           </Button>
         )}
@@ -46,7 +47,7 @@ function GameList() {
           <EmptyState art="🎲" title="No games yet">
             <p>Start one and everyone in the chat can join in. Most games are played together, as a team.</p>
           </EmptyState>
-          {canStart && <GameShelf onPick={() => setCreating(true)} />}
+          {canStart && <GameShelf onPick={(type) => setCreating({ type })} />}
         </>
       ) : (
         <>
@@ -58,17 +59,17 @@ function GameList() {
           </p>
         </>
       )}
-      <NewGameDialog open={creating} onClose={() => setCreating(false)} />
+      <NewGameDialog open={!!creating} start={creating ? creating.type : undefined} onClose={() => setCreating(false)} />
     </div>
   );
 }
 
-function GameShelf({ onPick }: { onPick: () => void }) {
+function GameShelf({ onPick }: { onPick: (type: string) => void }) {
   return (
     <ul className="shelf">
       {gameDefs.map((d) => (
         <li key={d.type}>
-          <button type="button" className="shelf-item sheet" onClick={onPick}>
+          <button type="button" className="shelf-item sheet" onClick={() => onPick(d.type)}>
             <span className="shelf-art" aria-hidden="true">
               {d.emoji}
             </span>
@@ -178,7 +179,7 @@ function GameView({ id }: { id: number }) {
           <p className="muted room-sub">
             {game ? (
               <>
-                <span>{Object.values(game.seats).includes('computer') ? 'Against the computer' : (def?.modeLabels?.[game.mode] ?? (game.mode === 'coop' ? 'Together' : 'Against each other'))}</span>
+                <span>{def?.modeLabels?.[game.mode] ?? (Object.values(game.seats).includes('computer') ? 'Against the computer' : game.mode === 'coop' ? 'Together' : 'Against each other')}</span>
                 {room && (
                   <>
                     <span aria-hidden="true">·</span>
@@ -221,14 +222,39 @@ function GameView({ id }: { id: number }) {
         {error && <Notice tone="danger">{error}</Notice>}
         {!game && !error && <Spinner label="Loading the game" />}
         {game && def?.basics && learn && game.status === 'active' && <Basics game={def.type} gameId={game.id} lessons={def.basics} />}
-        {game && def && <def.Board game={game} play={play} me={me} people={people} room={room} />}
+        {game && def && (
+          <BoardGuard>
+            <def.Board game={game} play={play} me={me} people={people} room={room} />
+          </BoardGuard>
+        )}
         {game && !def && <Notice tone="warning">This game needs a newer version of the app. Try reloading.</Notice>}
       </div>
     </div>
   );
 }
 
-export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClose: () => void; roomId?: number }) {
+/** Keeps a game that goes wrong on this device from taking the rest of the app with it. */
+class BoardGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <Notice tone="warning">
+        <p>Something went wrong showing this game on this device. Reloading the app usually sorts it out.</p>
+        <Button size="sm" icon="refresh" onClick={() => window.location.reload()}>
+          Reload
+        </Button>
+      </Notice>
+    );
+  }
+}
+
+export function NewGameDialog({ open, onClose, roomId, start: startWith }: { open: boolean; onClose: () => void; roomId?: number; start?: string }) {
   const { rooms, me, people, toast, refreshGames } = useStore();
   const [def, setDef] = useState<GameDef | null>(null);
   const [mode, setMode] = useState<Mode>('coop');
@@ -246,7 +272,11 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
       setDef(null);
       setBusy(false);
       setRoom(roomId);
-    } else setBand(defaultBand(me));
+    } else {
+      setBand(defaultBand(me));
+      const first = startWith ? gameDef(startWith) : undefined;
+      if (first) choose(first);
+    }
   }, [open, roomId]);
 
   const defaults = useMemo(
@@ -307,26 +337,35 @@ export function NewGameDialog({ open, onClose, roomId }: { open: boolean; onClos
       }
     >
       {!def ? (
-        <ul className="game-picker">
-          {gameDefs.map((d) => (
-            <li key={d.type}>
-              <button type="button" className="game-pick" onClick={() => choose(d)}>
-                <span className="game-pick-art" aria-hidden="true">
-                  {d.emoji}
-                </span>
-                <span className="game-pick-text">
-                  <strong>{d.name}</strong>
-                  <span className="muted">{d.blurb}</span>
-                  <span className="game-pick-tags">
-                    {d.modes.includes('coop') && <span className="pill pill-coop">{d.modeLabels?.coop ?? 'Together'}</span>}
-                    {d.modes.includes('versus') && <span className="pill">{d.modeLabels?.versus ?? 'Against each other'}</span>}
-                    <span className="pill pill-quiet">{d.players}</span>
-                  </span>
-                </span>
-              </button>
-            </li>
+        <div className="game-shelves">
+          {gameShelves.map((shelf, i) => (
+            <section key={shelf.title} className="game-shelf" aria-labelledby={`shelf-${i}`}>
+              <h3 className="section-label" id={`shelf-${i}`}>
+                {shelf.title}
+              </h3>
+              <ul className="game-picker">
+                {shelf.games.map((d) => (
+                  <li key={d.type}>
+                    <button type="button" className="game-pick" onClick={() => choose(d)}>
+                      <span className="game-pick-art" aria-hidden="true">
+                        {d.emoji}
+                      </span>
+                      <span className="game-pick-text">
+                        <strong>{d.name}</strong>
+                        <span className="muted">{d.blurb}</span>
+                        <span className="game-pick-tags">
+                          {d.modes.includes('coop') && <span className="pill pill-coop">{d.modeLabels?.coop ?? 'Together'}</span>}
+                          {d.modes.includes('versus') && <span className="pill">{d.modeLabels?.versus ?? 'Against each other'}</span>}
+                          <span className="pill pill-quiet">{d.players}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       ) : (
         <div className="stack">
           <p className="lede">{def.blurb}</p>

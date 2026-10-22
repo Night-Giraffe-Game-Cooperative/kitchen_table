@@ -209,7 +209,7 @@ export function RoomView({ room }: { room: Room }) {
               Join call
             </a>
           ) : (
-            <a className="icon-btn btn-ghost" href={`#/call/${room.id}`} aria-label="Start a video call" title="Start a video call">
+            <a className="icon-btn btn-ghost" href={`#/call/${room.id}`} aria-label="Start a video call" data-tip="Start a video call">
               <Icon name="video" />
             </a>
           ))}

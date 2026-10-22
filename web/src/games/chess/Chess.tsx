@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
-import { Avatar, Button, Field, Segmented, Select } from '../../components/ui';
+import { Avatar, Button, Segmented } from '../../components/ui';
 import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, Update } from '../common';
 import { nameOf } from '../common';
@@ -27,6 +27,7 @@ import { HINT, TipNote, useLearn, useTips } from '../learn';
 import { PROMOTE_TIP, chessBasics, chessGuide, endTip, explainMove, pieceTips, riskOf, theirMoveTip, turnTips } from './learn';
 import { bandOf, type Band } from '../bands';
 import { confirmFirst } from '../../components/confirm';
+import { OpponentSelect, WhoPlays, whoHint, type Who } from '../opponents';
 
 type Seat = 'white' | 'black';
 
@@ -36,7 +37,10 @@ interface State {
   history: string[]; // positions before each move, for repetition and taking back
   moves: string[];
   last: [number, number] | null;
+  /** Kept at 3 or below, as older copies of the app only know three levels. */
   level?: Level;
+  /** The computer's real strength, 4 for 14 and up. */
+  strength?: Level;
   ended?: string;
 }
 
@@ -44,7 +48,7 @@ interface Options {
   side: 'white' | 'black' | 'random';
   opponent: number | 'open';
   /** Against the computer: everyone in the chat as one team, or just the person starting it. */
-  who: 'team' | 'me';
+  who: Who;
 }
 
 const seatOf = (s: Side): Seat => (s === 'w' ? 'white' : 'black');
@@ -52,6 +56,7 @@ const sideOf = (s: Seat): Side => (s === 'white' ? 'w' : 'b');
 const levels: Record<Level, string> = { 1: 'Gentle', 2: 'Steady', 3: 'Tricky', 4: 'Strong' };
 /** How well the computer plays for each age band. */
 const levelFor: Record<Band, Level> = { '5-7': 1, '8-10': 2, '11-13': 3, '14+': 4 };
+const strengthOf = (s: State): Level => s.strength ?? s.level ?? 2;
 
 /** Plays one move and reports whether that ended the game. */
 function play(state: State, move: Move): { state: State; over: ReturnType<typeof outcome> } {
@@ -148,7 +153,7 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
       let step = play(st, move);
       if (step.over) return { state: { ...step.state, ended: step.over.kind }, status: 'finished', summary: describeEnd(step.over, g, people) };
       if (coop && g.seats[step.state.turn] === 'computer') {
-        const reply = chooseMove(parseFen(step.state.fen), st.level ?? 2, undefined, [...step.state.history, step.state.fen]);
+        const reply = chooseMove(parseFen(step.state.fen), strengthOf(st), undefined, [...step.state.history, step.state.fen]);
         if (reply) {
           step = play(step.state, reply);
           if (step.over) return { state: { ...step.state, ended: step.over.kind }, status: 'finished', summary: describeEnd(step.over, g, people) };
@@ -230,7 +235,7 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
       <div className="chess-player" data-turn={(!done && s.turn === seat) || undefined}>
         {typeof who === 'number' ? <Avatar person={people.get(who)} size="xs" /> : <span aria-hidden="true">{who === 'computer' ? '🤖' : who === 'team' ? '👨‍👩‍👧' : '❔'}</span>}
         <span>
-          {who === 'computer' ? `Computer (${levels[s.level ?? 2].toLowerCase()})` : nameOf(people, who, me.id)} · {seat}
+          {who === 'computer' ? `Computer (${levels[strengthOf(s)].toLowerCase()})` : nameOf(people, who, me.id)} · {seat}
         </span>
         <span
           className="chess-captured"
@@ -363,52 +368,20 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
 }
 
 function Options({ value, onChange, mode, band, room, me, people }: OptionsProps<Options>) {
-  const others = room.member_ids.filter((id) => id !== me.id && people.get(id)?.active);
   return mode === 'coop' ? (
     <>
       <WhoPlays
-        value={value}
-        onChange={onChange}
-        hint={`${value.who === 'team' ? "Anyone in the chat can make the family's move." : 'Only you make the moves, and the others can watch.'} ${
-          band === '14+' ? 'Take a move back whenever you like.' : 'Ask for a hint or take a move back whenever you like.'
-        }`}
+        value={value.who}
+        onChange={(who) => onChange({ ...value, who })}
+        hint={`${whoHint(value.who)} ${band === '14+' ? 'Take a move back whenever you like.' : 'Ask for a hint or take a move back whenever you like.'}`}
       />
       <SidePicker value={value} onChange={onChange} label={value.who === 'team' ? 'The family plays' : 'You play'} />
     </>
   ) : (
     <>
-      <Field label="Playing against">
-        {(p) => (
-          <Select {...p} value={String(value.opponent)} onChange={(e) => onChange({ ...value, opponent: e.target.value === 'open' ? 'open' : Number(e.target.value) })}>
-            <option value="open">Whoever wants to play</option>
-            {others.map((id) => (
-              <option key={id} value={id}>
-                {people.get(id)?.name}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
+      <OpponentSelect value={value.opponent} onChange={(opponent) => onChange({ ...value, opponent })} room={room} me={me} people={people} />
       <SidePicker value={value} onChange={onChange} label="You play" />
     </>
-  );
-}
-
-function WhoPlays({ value, onChange, hint }: { value: Options; onChange: (o: Options) => void; hint: string }) {
-  return (
-    <div className="field">
-      <span className="field-label">Who plays the computer</span>
-      <Segmented
-        label="Who plays the computer"
-        value={value.who}
-        onChange={(who) => onChange({ ...value, who })}
-        options={[
-          { value: 'team', label: 'Everyone in the chat', icon: 'team' },
-          { value: 'me', label: 'Just me', icon: 'me' },
-        ]}
-      />
-      <p className="field-hint">{hint}</p>
-    </div>
   );
 }
 
@@ -431,7 +404,7 @@ function SidePicker({ value, onChange, label }: { value: Options; onChange: (o: 
 }
 
 function fresh(level?: Level): State {
-  return { turn: 'white', fen: START_FEN, history: [], moves: [], last: null, ...(level ? { level } : {}) };
+  return { turn: 'white', fen: START_FEN, history: [], moves: [], last: null, ...(level ? { level: Math.min(level, 3) as Level, strength: level } : {}) };
 }
 
 export const chess: GameDef<State, Options> = {

@@ -50,10 +50,11 @@ defmodule Family.Export do
       end)
 
     # The reminders grown-ups set are their notes about a kid, so a kid's own
-    # download keeps only the reminders they set themselves.
+    # download keeps only the reminders they set themselves (a reminder whose
+    # grown-up has left has no setter, and stays hidden).
     hidden =
       if user.role == "kid",
-        do: MapSet.new(Repo.all(from t in Task, where: t.kind == "reminder" and t.created_by_id != ^user.id, select: t.id)),
+        do: MapSet.new(Repo.all(from t in Task, where: t.kind == "reminder" and (is_nil(t.created_by_id) or t.created_by_id != ^user.id), select: t.id)),
         else: MapSet.new()
 
     tasks = Repo.all(from t in Task, order_by: t.id) |> Enum.filter(&(user.id in &1.user_ids and not MapSet.member?(hidden, &1.id)))

@@ -1,0 +1,458 @@
+/*
+ * Where's the Giraffe?: a family photo in a wooden frame, guess dots that run
+ * from cold blue to hot red, a soft glow over his area, and the Night Giraffe
+ * peeking out. Things on the photo keep fixed colours, since they sit on a
+ * picture rather than the page; everything around it uses the tokens.
+ */
+
+.gf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  container-type: inline-size;
+}
+
+.gf-said {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--text-base);
+  font-weight: 650;
+}
+
+/* ---------- The photo in its frame ---------- */
+
+.gf-stage {
+  align-self: center;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #9c7652, #6e4e31);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.15),
+    var(--shadow-lift);
+}
+
+.gf-photo {
+  position: relative;
+  width: min(calc(100vw - 3.5rem), calc(64dvh * var(--ar)));
+  width: min(100cqw - 1.2rem, 64dvh * var(--ar));
+  aspect-ratio: var(--ar);
+  overflow: hidden;
+  border-radius: 0.2rem;
+  background: #4d3520;
+  box-shadow: 0 0 0 2px #4d3520;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gf-photo[data-live] {
+  cursor: crosshair;
+}
+
+.gf-photo[data-busy] {
+  cursor: progress;
+}
+
+.gf-photo:focus-visible {
+  outline: var(--focus-ring) solid var(--focus);
+  outline-offset: 0.85rem;
+}
+
+.gf-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* The arrow-key crosshair, only while the photo has keyboard focus. */
+.gf-cross {
+  display: none;
+  position: absolute;
+  z-index: 6;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: -1.375rem 0 0 -1.375rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #17181b,
+    inset 0 0 0 2px #17181b;
+  pointer-events: none;
+  transition:
+    left var(--motion-fast) var(--ease),
+    top var(--motion-fast) var(--ease);
+}
+
+.gf-cross::before,
+.gf-cross::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px #17181b;
+  transform: translate(-50%, -50%);
+}
+
+.gf-cross::before {
+  width: 1rem;
+  height: 2px;
+}
+
+.gf-cross::after {
+  width: 2px;
+  height: 1rem;
+}
+
+.gf-photo:focus-visible .gf-cross {
+  display: block;
+}
+
+/* ---------- Guesses ---------- */
+
+/* Cold blue to hot red; a symbol inside each dot says the same thing. */
+:is(.gf-dot, .gf-chip)[data-heat='0'] {
+  --heat: #2f6fd6;
+}
+:is(.gf-dot, .gf-chip)[data-heat='1'] {
+  --heat: #5aa8d0;
+}
+:is(.gf-dot, .gf-chip)[data-heat='2'] {
+  --heat: #ecc040;
+}
+:is(.gf-dot, .gf-chip)[data-heat='3'] {
+  --heat: #f2812f;
+}
+:is(.gf-dot, .gf-chip)[data-heat='4'] {
+  --heat: #d9283b;
+}
+:is(.gf-dot, .gf-chip)[data-found] {
+  --heat: #ffd84d;
+}
+
+/* Each dot wears a ring in the colour of whoever guessed. */
+.gf-dot {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.75rem 0 0 -0.75rem;
+  border-radius: 50%;
+  background: var(--heat, var(--tint));
+  color: var(--ink-c);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--ink-c),
+    0 2px 6px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+  animation: gf-drop 280ms var(--ease) both;
+}
+
+.gf-dot[data-last] {
+  z-index: 4;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin: -0.95rem 0 0 -0.95rem;
+  font-size: 1rem;
+}
+
+.gf-dot[data-last]::after {
+  content: '';
+  position: absolute;
+  inset: -0.45rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: gf-ping 1.1s var(--ease) 0.2s 2;
+}
+
+.gf-dot-pending {
+  background: rgb(255 255 255 / 0.7);
+  box-shadow:
+    0 0 0 2px #17181b,
+    0 2px 6px rgb(0 0 0 / 0.45);
+  animation: gf-wait 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes gf-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.6rem) scale(0.4);
+  }
+}
+
+@keyframes gf-ping {
+  from {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes gf-wait {
+  to {
+    transform: scale(0.75);
+  }
+}
+
+/* What the latest guess says, beside its dot. */
+.gf-say {
+  --tx: 1.35rem;
+  --ty: -50%;
+  position: absolute;
+  z-index: 5;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: #fffdf8;
+  color: #17181b;
+  font-size: var(--text-sm);
+  font-weight: 750;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  transform: translate(var(--tx), var(--ty));
+  animation: gf-say-in 300ms var(--ease) both;
+}
+
+.gf-say[data-side='left'] {
+  --tx: calc(-100% - 1.35rem);
+}
+
+.gf-say[data-edge='top'] {
+  --ty: -10%;
+}
+
+.gf-say[data-edge='bottom'] {
+  --ty: -90%;
+}
+
+@keyframes gf-say-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+/* The area he's in: a soft warm glow with a dashed edge, so it doesn't rely on colour. */
+.gf-glow {
+  position: absolute;
+  z-index: 1;
+  aspect-ratio: 1;
+  border: 2px dashed rgb(255 246 210 / 0.95);
+  border-radius: 50%;
+  background: radial-gradient(circle closest-side, rgb(255 236 150 / 0.5), rgb(255 214 102 / 0.3) 70%, rgb(255 214 102 / 0.15));
+  box-shadow:
+    0 0 1.5rem 0.4rem rgb(255 214 102 / 0.45),
+    0 0 0 1px rgb(0 0 0 / 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: gf-glow 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes gf-glow {
+  from {
+    opacity: 0.7;
+  }
+}
+
+/* ---------- The Night Giraffe ---------- */
+
+/* How close a guess must be, shown to the hider. */
+.gf-ring {
+  position: absolute;
+  z-index: 1;
+  aspect-ratio: 1;
+  border: 2px dashed #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.35),
+    inset 0 0 0 1px rgb(0 0 0 / 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition:
+    left var(--motion) var(--ease),
+    top var(--motion) var(--ease);
+}
+
+.gf-him {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transition:
+    left var(--motion) var(--ease),
+    top var(--motion) var(--ease);
+}
+
+.gf-him-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 100 / 120;
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.35));
+}
+
+/* Only the hider sees him while he's hiding, and only faintly. */
+.gf-him[data-hidden] {
+  opacity: 0.6;
+}
+
+.gf-him[data-hidden] .gf-him-art {
+  animation: gf-pop 320ms var(--ease) both;
+}
+
+.gf-him[data-reveal] {
+  z-index: 5;
+}
+
+.gf-him[data-reveal] .gf-him-art {
+  transform-origin: 50% 85%;
+  animation: gf-pop 650ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* Found! He pops up and nods hello. */
+.gf-him[data-reveal='found'] .gf-him-art {
+  animation:
+    gf-pop 650ms cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    gf-nod 1.3s ease-in-out 700ms 2;
+}
+
+@keyframes gf-pop {
+  from {
+    opacity: 0;
+    transform: translateY(35%) scale(0.3);
+  }
+}
+
+@keyframes gf-nod {
+  25% {
+    transform: rotate(-7deg);
+  }
+  75% {
+    transform: rotate(7deg);
+  }
+}
+
+.gf-sparkle {
+  position: absolute;
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0;
+  animation: gf-twinkle 1.6s ease-out both;
+}
+
+.gf-sparkle[data-n='1'] {
+  left: -8%;
+  top: 10%;
+  animation-delay: 0.35s;
+}
+
+.gf-sparkle[data-n='2'] {
+  right: -8%;
+  top: 2%;
+  animation-delay: 0.55s;
+}
+
+.gf-sparkle[data-n='3'] {
+  left: 44%;
+  top: -14%;
+  animation-delay: 0.75s;
+}
+
+@keyframes gf-twinkle {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60%) scale(0.8);
+  }
+}
+
+/* ---------- Around the photo ---------- */
+
+.gf-hint {
+  margin: 0;
+}
+
+.gf-glow-note {
+  font-weight: 650;
+}
+
+.gf-learn {
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: var(--info-soft);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.gf-log {
+  padding: 0.7rem 0.9rem 0.8rem;
+  border-radius: var(--radius-md);
+}
+
+.gf-log-title {
+  margin: 0 0 0.45rem;
+  font-size: var(--text-base);
+}
+
+.gf-log-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.4rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gf-log-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.9rem;
+  font-size: var(--text-sm);
+}
+
+.gf-chip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--heat, var(--tint));
+  color: var(--ink-c);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--ink-c);
+}
+
+.gf-log-name {
+  font-weight: 700;
+  color: var(--ink-c);
+}
+
+.gf-log-more {
+  margin: 0.45rem 0 0;
+  font-size: var(--text-sm);
+}

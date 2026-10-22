@@ -33,6 +33,8 @@ interface Turn {
   side: Side;
   roll: [number, number];
   moves: Move[];
+  /** How many of the other side's checkers this turn sent to the bar. */
+  hits?: number;
 }
 
 interface State {
@@ -78,6 +80,12 @@ function finishLine(pos: Position, game: Game<State>, people: GameProps<State>['
   return `${nameOf(people, who)} beat ${nameOf(people, other)} at backgammon${extra}`;
 }
 
+/** How many of the other side's checkers went to the bar between two positions in one turn. */
+const hitsBy = (before: Position, after: Position) => {
+  const other: Side = before.turn === 'w' ? 'b' : 'w';
+  return Math.max(0, after.bar[other] - before.bar[other]);
+};
+
 /** The computer takes a whole turn: roll, move, pass back. */
 function computerTurn(st: State): State {
   const roll = rollDice();
@@ -85,7 +93,7 @@ function computerTurn(st: State): State {
   const moves = chooseSequence(st.pos, dice, st.level ?? 2);
   let pos = st.pos;
   for (const m of moves) pos = applyMove(pos, m);
-  const last: Turn = { side: st.pos.turn, roll, moves };
+  const last: Turn = { side: st.pos.turn, roll, moves, hits: hitsBy(st.pos, pos) };
   if (winner(pos)) return { ...st, pos, last, roll: null, dice: [] };
   const next = endTurn(pos);
   return { ...st, pos: next, turn: seatOf(next.turn), roll: null, dice: [], last };
@@ -149,7 +157,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
     const who = last ? game.seats[seatOf(last.side)] : undefined;
     const theirs =
       learn && last && !s.roll && last.side !== s.pos.turn
-        ? theirTurnTip(last.roll, last.moves.length, s.pos.bar[s.pos.turn] > 0, who === 'computer' ? 'The computer' : nameOf(people, who), String(game.version))
+        ? theirTurnTip(last.roll, last.moves.length, (last.hits ?? 0) > 0, who === 'computer' ? 'The computer' : nameOf(people, who), String(game.version))
         : null;
     tips.offer(theirs, ...turnTips(s.pos, s.dice, !!s.roll));
   }, [game.version, myTurn, done, learn]);
@@ -207,7 +215,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
       if (!replayOk(st, moves)) return null;
       let p = st.pos;
       for (const m of moves) p = applyMove(p, m);
-      const mine: Turn = { side: st.pos.turn, roll: st.roll, moves };
+      const mine: Turn = { side: st.pos.turn, roll: st.roll, moves, hits: hitsBy(st.pos, p) };
       if (winner(p)) return { state: { ...st, pos: p, roll: null, dice: [], last: mine }, status: 'finished', summary: finishLine(p, g, people) };
       const passed = endTurn(p);
       let next: State = { ...st, pos: passed, turn: seatOf(passed.turn), roll: null, dice: [], last: mine };

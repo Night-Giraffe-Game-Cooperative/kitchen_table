@@ -1,6 +1,7 @@
 defmodule Family.TasksTest do
   use FamilyWeb.ConnCase, async: false
-  alias Family.Tasks
+  import Ecto.Query
+  alias Family.{Repo, Tasks}
 
   setup do
     admin = admin_fixture()
@@ -151,6 +152,11 @@ defmodule Family.TasksTest do
     assert %{title: "Read a chapter", pence: 0, stars: 0} = own
     :ok = Tasks.tick(mia, own.id, mia.id, ~D[2026-10-21], true)
     assert %{stars: 4, stickers: [_, _]} = mine.(jo)
+
+    # One a kid made before that rule came in may still carry a sticker; any change takes it off.
+    Repo.update_all(from(t in Tasks.Task, where: t.id == ^own.id), set: [sticker: true, stars: 1])
+    {:ok, own} = Tasks.update(jo, own.id, %{"title" => "Read two chapters"})
+    assert %{stars: 0, sticker: false} = own
 
     # A grown-up's task can still be changed by them without touching its rewards.
     {:ok, bed} = Tasks.update(jo, bed.id, %{"title" => "Make the bed nicely"})

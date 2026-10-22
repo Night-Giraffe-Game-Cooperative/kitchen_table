@@ -280,6 +280,99 @@ test('age groups and learn mode', async () => {
   await admin.evaluate(() => localStorage.removeItem('games:band'));
 });
 
+test('the newer games: Pairs, Four in a Row, Where\'s the Giraffe?, Dots and Boxes, Family Quiz, Snakes and Ladders', async () => {
+  const dialog = admin.getByRole('dialog');
+  async function newGame(name: RegExp) {
+    await admin.getByRole('link', { name: /^Games\b/ }).click();
+    await admin.getByRole('button', { name: 'New game' }).click();
+    // The games are on shelves.
+    await expect(dialog.getByRole('heading', { name: 'Board games' })).toBeVisible();
+    await dialog.getByRole('button', { name }).click();
+  }
+  const status = admin.locator('.game-status');
+
+  // Pairs, with cards from the family's photos.
+  await newGame(/^Pairs/);
+  await dialog.getByRole('radio', { name: /Family photos/ }).click();
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  const cards = admin.getByRole('group', { name: 'Cards' }).getByRole('button');
+  await expect(cards).toHaveCount(16);
+  await cards.nth(0).click();
+  await cards.nth(1).click();
+  await expect(status).toContainText('1 turn');
+  await shot(admin, '41-pairs');
+
+  // Four in a Row against the computer: it answers in the same move.
+  await newGame(/^Four in a Row/);
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await admin.getByRole('button', { name: /^Column 4/ }).click();
+  await expect(admin.locator('.fiar-board .fiar-disc:not(.fiar-ghost)')).toHaveCount(2, { timeout: 15_000 });
+  await expect(status).toHaveText("The family's turn");
+  await shot(admin, '42-four-in-a-row');
+
+  // Where's the Giraffe? Alex hides him, Mia finds him on her phone.
+  await newGame(/^Where's the Giraffe/);
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  const photo = admin.locator('.gf-photo');
+  const box = (await photo.boundingBox())!;
+  await photo.click({ position: { x: box.width * 0.3, y: box.height * 0.4 } });
+  await admin.getByRole('button', { name: 'Hide him here' }).click();
+  await expect(status).toContainText('Seeking');
+  await kid.goto('/#/games');
+  await kid.getByRole('link', { name: /Where's the Giraffe/ }).first().click();
+  const seek = kid.locator('.gf-photo');
+  await expect(seek).toHaveAttribute('role', 'application');
+  const kbox = (await seek.boundingBox())!;
+  await seek.click({ position: { x: kbox.width * 0.9, y: kbox.height * 0.9 } });
+  await expect(kid.locator('.gf-dot')).toHaveCount(1);
+  await seek.click({ position: { x: kbox.width * 0.3, y: kbox.height * 0.4 } });
+  await expect(kid.locator('.game-status')).toContainText('Found by you!');
+  await expect(status).toContainText('Found by Mia');
+  await shot(kid, '43-phone-giraffe-found');
+
+  // Dots and Boxes against the computer.
+  await newGame(/^Dots and Boxes/);
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await admin.locator('button[aria-label^="Line"]').first().click();
+  await expect(status).toContainText("The family's turn", { timeout: 15_000 });
+  await shot(admin, '44-dots-and-boxes');
+
+  // Family Quiz: a question each, tapped together from ideas, then answered.
+  await newGame(/^Family Quiz/);
+  await dialog.getByRole('radio', { name: '1', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  async function write(page: Page) {
+    await page.getByRole('group', { name: 'Question ideas' }).getByRole('button').first().click();
+    await page.getByRole('group', { name: 'Tap the right answer' }).getByRole('button').nth(1).click();
+    await page.getByRole('button', { name: 'Save my question' }).click();
+  }
+  await write(admin);
+  await kid.goto('/#/games');
+  await kid.getByRole('link', { name: /Family Quiz/ }).first().click();
+  await write(kid);
+  await admin.getByRole('button', { name: 'Start the quiz' }).click();
+  // Anyone who hasn't written one yet is named before it starts.
+  await expect(dialog).toContainText('Start the quiz now?');
+  await dialog.getByRole('button', { name: 'Start the quiz' }).click();
+  await expect(kid.locator('.game-status')).toContainText('Your turn to answer');
+  await kid.locator('.fq-answer').first().click();
+  await expect(kid.getByText(/^(You got it!|Not quite\.)/)).toBeVisible();
+  await shot(kid, '45-phone-family-quiz');
+  await admin.locator('.fq-answer').first().click();
+  await expect(status).toContainText('The family got');
+  await shot(admin, '46-family-quiz-results');
+
+  // Snakes and Ladders against the Night Giraffe: the family rolls, then he does.
+  await newGame(/^Snakes and Ladders/);
+  await dialog.getByRole('radio', { name: '8–10' }).click();
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(admin.getByText('Against the Night Giraffe')).toBeVisible();
+  await admin.getByRole('button', { name: /^Roll/ }).click();
+  await expect(status).toContainText(/The family rolled a \d/, { timeout: 15_000 });
+  await expect(status).toContainText(/The Night Giraffe rolled a \d/, { timeout: 15_000 });
+  await shot(admin, '47-phone-snakes-and-ladders');
+});
+
 test('a grown-up signs in, and the Me page', async ({ browser }) => {
   const mum = await open(browser, { width: 820, height: 1180 });
   await mum.goto('/');

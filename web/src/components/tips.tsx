@@ -24,6 +24,12 @@ function place(bubble: HTMLElement, anchor: DOMRect) {
   bubble.dataset.side = above >= GAP ? 'above' : 'below';
 }
 
+/**
+ * Where a bubble goes: inside an open dialog when its button is in one, since
+ * a dialog sits above everything else on the page, and otherwise the page.
+ */
+const layerOf = (anchor: Element | null): Element => anchor?.closest('dialog[open]') ?? document.body;
+
 const tipOf = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[data-tip]') : null);
 
 /** Mounted once: the label bubble for everything with data-tip. */
@@ -33,14 +39,19 @@ export function TipLayer() {
 
   useEffect(() => {
     let timer: number | undefined;
+    // Hides a label a little while after a hold ends; kept apart so it can't cancel the next hold.
+    let later: number | undefined;
     let shown: HTMLElement | null = null;
     // A button whose label came up from a hold: the tap that ends the hold doesn't press it.
     let held: HTMLElement | null = null;
     let start: { x: number; y: number } | null = null;
+    // Whether the last press was a finger, not a mouse: only then is a long press a request for the label.
+    let touch = false;
 
     const show = (el: HTMLElement) => {
       const text = el.dataset.tip;
       if (!text || !el.isConnected) return;
+      window.clearTimeout(later);
       shown = el;
       setTip({ text, anchor: el });
     };
@@ -65,9 +76,11 @@ export function TipLayer() {
       if (tipOf(e.target)) hide();
     };
     const down = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse') return hide();
-      const el = tipOf(e.target);
+      window.clearTimeout(later);
       held = null;
+      touch = e.pointerType !== 'mouse';
+      if (!touch) return hide();
+      const el = tipOf(e.target);
       if (!el) return hide();
       start = { x: e.clientX, y: e.clientY };
       window.clearTimeout(timer);
@@ -85,7 +98,7 @@ export function TipLayer() {
     const up = () => {
       start = null;
       if (!held) window.clearTimeout(timer);
-      else window.setTimeout(hide, 1800);
+      else later = window.setTimeout(hide, 1800);
     };
     const click = (e: MouseEvent) => {
       if (held && e.target instanceof Node && held.contains(e.target)) {
@@ -95,7 +108,7 @@ export function TipLayer() {
       held = null;
     };
     const menu = (e: Event) => {
-      if (held || tipOf(e.target)) e.preventDefault();
+      if (touch && (held || tipOf(e.target))) e.preventDefault();
     };
     const focus = (e: FocusEvent) => {
       const el = tipOf(e.target);
@@ -122,6 +135,7 @@ export function TipLayer() {
     window.addEventListener('scroll', hide, true);
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(later);
       document.removeEventListener('pointerover', over);
       document.removeEventListener('pointerout', out);
       document.removeEventListener('pointerdown', down, true);
@@ -147,7 +161,7 @@ export function TipLayer() {
     <div ref={bubble} className="tip-bubble" aria-hidden="true" onPointerLeave={() => setTip(null)}>
       {tip.text}
     </div>,
-    document.body,
+    layerOf(tip.anchor),
   );
 }
 
@@ -208,7 +222,7 @@ export function InfoTip({ about, children }: { about: string; children: ReactNod
           <div ref={note} className="tip-bubble info-note" aria-hidden="true">
             {children}
           </div>,
-          document.body,
+          layerOf(button.current),
         )}
     </>
   );

@@ -66,7 +66,7 @@ defmodule Family.Tasks do
         people =
           cond do
             t.kind != "reminder" -> visible
-            user.role == "kid" -> if t.created_by_id == user.id, do: [user.id], else: []
+            user.role == "kid" -> if t.created_by_id == user.id and user.id in visible, do: [user.id], else: []
             true -> reminded
           end
 
@@ -336,7 +336,11 @@ defmodule Family.Tasks do
   # Rewards come from grown-ups: kids leave them as they are, and a task a kid
   # set themselves earns none, whoever changes it.
   defp clean(attrs, user, %Task{created_by_id: by}) do
-    if user.role == "kid" or by_kid?(by), do: clean(attrs, %User{role: "kid"}), else: clean(attrs, user)
+    cond do
+      by_kid?(by) -> attrs |> clean(nil) |> Map.merge(%{"stars" => 0, "pence" => 0, "sticker" => false})
+      user.role == "kid" -> clean(attrs, %User{role: "kid"})
+      true -> clean(attrs, user)
+    end
   end
 
   defp clean(attrs, %User{role: "kid"}), do: attrs |> clean(nil) |> Map.drop(~w(stars pence sticker))

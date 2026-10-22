@@ -397,3 +397,21 @@ family mostly plays. They now show a label on hover, keyboard focus, or a
 press and hold, and a hold doesn't press the button, so holding is a safe way
 to ask "what does this do?". Most screens already explain themselves in a
 line of grey text, so the (i) notes are kept to the few places that didn't.
+
+**22 Oct 2026. Six more games, on shelves.** Pairs, Where's the Giraffe?,
+Family Quiz, Snakes and Ladders, Four in a Row and Dots and Boxes bring the
+games to fourteen, so New game puts them on three shelves (drawing and
+stories; puzzles, memory and quizzes; board games) rather than one long list.
+Two of them use the family's own photos from the chat, like Picture Puzzle,
+because a game about your own kitchen is more fun than one about a stock
+picture. Where's the Giraffe? keeps the hiding place in the game's state like
+any other move, so a determined child with the browser's developer tools
+could find him; it's a family game and a referee on the server would mean
+game rules there, which the app avoids. A computer opponent can't take a
+turn of its own, since the server only lets the seat whose turn it is move,
+so its reply is worked out in the same move as the person's, as chess does.
+Family Quiz is played in people's own time: it asks everyone in the chat for
+questions, but once answering starts it only waits on (and only shows "Your
+turn" to) the people who wrote some. A game that goes wrong on one device now
+shows a reload button instead of blanking the app, and chess games keep a
+computer level older copies of the app understand.

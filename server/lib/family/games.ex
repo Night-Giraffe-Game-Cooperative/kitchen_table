@@ -23,7 +23,13 @@ defmodule Family.Games do
     "backgammon" => ~w(versus coop),
     "word_garden" => ~w(coop versus),
     "picture_puzzle" => ~w(coop versus),
-    "story_chain" => ~w(coop versus)
+    "story_chain" => ~w(coop versus),
+    "pairs" => ~w(coop versus),
+    "four_in_a_row" => ~w(coop versus),
+    "wheres_giraffe" => ~w(coop),
+    "dots_boxes" => ~w(coop versus),
+    "family_quiz" => ~w(coop),
+    "snakes_ladders" => ~w(coop versus)
   }
 
   @names %{
@@ -34,7 +40,13 @@ defmodule Family.Games do
     "backgammon" => "the backgammon game",
     "word_garden" => "Word Garden",
     "picture_puzzle" => "Picture Puzzle",
-    "story_chain" => "Story Chain"
+    "story_chain" => "Story Chain",
+    "pairs" => "Pairs",
+    "four_in_a_row" => "the Four in a Row game",
+    "wheres_giraffe" => "Where's the Giraffe?",
+    "dots_boxes" => "the Dots and Boxes game",
+    "family_quiz" => "the Family Quiz",
+    "snakes_ladders" => "the Snakes and Ladders game"
   }
 
   # What a live doodle may add to without a version check.

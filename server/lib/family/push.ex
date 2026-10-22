@@ -29,7 +29,13 @@ defmodule Family.Push do
     "backgammon" => "Backgammon",
     "word_garden" => "Word Garden",
     "picture_puzzle" => "Picture Puzzle",
-    "story_chain" => "Story Chain"
+    "story_chain" => "Story Chain",
+    "pairs" => "Pairs",
+    "four_in_a_row" => "Four in a Row",
+    "wheres_giraffe" => "Where's the Giraffe?",
+    "dots_boxes" => "Dots and Boxes",
+    "family_quiz" => "Family Quiz",
+    "snakes_ladders" => "Snakes and Ladders"
   }
 
   def public_key, do: WebPush.public_key()

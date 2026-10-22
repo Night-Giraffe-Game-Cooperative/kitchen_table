@@ -1,0 +1,312 @@
+/*
+ * Dots and Boxes: dots on squared exercise-book paper with a margin line,
+ * lines in each player's pen colour, and claimed boxes coloured in with an
+ * initial. Each line still to draw has a diamond-shaped hit area that reaches
+ * both dots and the middle of the box on each side, so the diamonds tile the
+ * board and every tap lands on the nearest line.
+ *
+ * Sizes come from the paper's own width (container units), so the board
+ * scales from a phone to a desktop: --cell is one box.
+ */
+
+.db {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.db-seats {
+  margin-bottom: -0.15rem;
+}
+
+.db-pen {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.22rem;
+  margin-right: 0.35rem;
+  border-radius: var(--radius-full);
+  background: var(--ink-c);
+  vertical-align: 0.2em;
+}
+
+/* ---------- The paper ---------- */
+
+.db-paper {
+  /* Room for the focus ring round a line on the edge. */
+  --pad: clamp(1.25rem, 5vmin, 1.75rem);
+  --cell: calc(100cqi / var(--n));
+  --pen: clamp(0.25rem, calc(var(--cell) * 0.085), 0.45rem);
+  --dot: clamp(0.5rem, calc(var(--cell) * 0.13), 0.8rem);
+  --rule: color-mix(in srgb, var(--sky) 17%, transparent);
+  position: relative;
+  width: min(100%, 70dvh, 36rem);
+  margin: 0 auto;
+  padding: var(--pad);
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: var(--radius-md);
+}
+
+/* Squared paper, lined up with the dots. */
+.db-paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, var(--rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+  background-size: calc(var(--cell) / var(--sub)) calc(var(--cell) / var(--sub));
+  background-position: calc(var(--pad) - 0.5px) calc(var(--pad) - 0.5px);
+  pointer-events: none;
+}
+
+/* The exercise book's margin. */
+.db-paper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--pad) * 0.4);
+  width: 2px;
+  background: color-mix(in srgb, var(--rose) 40%, transparent);
+  pointer-events: none;
+}
+
+.db-grid {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.db-dot,
+.db-box,
+.db-line,
+.db-ink {
+  position: absolute;
+}
+
+.db-dot {
+  z-index: 3;
+  left: calc(var(--c) * 100% / var(--n));
+  top: calc(var(--r) * 100% / var(--n));
+  width: var(--dot);
+  height: var(--dot);
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--ink);
+  pointer-events: none;
+}
+
+/* ---------- Boxes ---------- */
+
+.db-box {
+  z-index: 0;
+  left: calc(var(--c) * 100% / var(--n));
+  top: calc(var(--r) * 100% / var(--n));
+  width: calc(100% / var(--n));
+  height: calc(100% / var(--n));
+  display: grid;
+  place-items: center;
+  padding: calc(var(--pen) / 2);
+  background-clip: content-box;
+  font-size: calc(var(--cell) * 0.42);
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.db-box[data-owner] {
+  background-color: var(--tint);
+  color: var(--ink-c);
+}
+
+.db-box[data-owner='emoji'] {
+  font-size: calc(var(--cell) * 0.36);
+}
+
+.db-box[data-fresh] {
+  animation: db-fill 420ms var(--ease) both;
+}
+
+@keyframes db-fill {
+  from {
+    background-color: transparent;
+    color: transparent;
+    scale: 0.6;
+  }
+  60% {
+    scale: 1.06;
+  }
+}
+
+/* One more line takes it: for the younger bands and in learn mode. */
+.db-box[data-glow] {
+  background-color: color-mix(in srgb, var(--sunflower) 24%, transparent);
+  animation: db-glow 1.3s var(--ease) infinite alternate;
+}
+
+.db-box[data-glow]::after {
+  content: '✨';
+  font-size: calc(var(--cell) * 0.26);
+}
+
+@keyframes db-glow {
+  from {
+    background-color: color-mix(in srgb, var(--sunflower) 10%, transparent);
+  }
+  to {
+    background-color: color-mix(in srgb, var(--sunflower) 34%, transparent);
+  }
+}
+
+/* ---------- Lines to draw ---------- */
+
+.db-line {
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  appearance: none;
+  /* The hit area reaches outside the button itself. */
+  overflow: visible;
+  cursor: pointer;
+  translate: -50% -50%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.db-line[data-dir='across'] {
+  left: calc((var(--c) + 0.5) * 100% / var(--n));
+  top: calc(var(--r) * 100% / var(--n));
+  width: calc(var(--cell) * 0.62);
+  height: min(1.75rem, calc(var(--cell) * 0.38));
+}
+
+.db-line[data-dir='down'] {
+  left: calc(var(--c) * 100% / var(--n));
+  top: calc((var(--r) + 0.5) * 100% / var(--n));
+  width: min(1.75rem, calc(var(--cell) * 0.38));
+  height: calc(var(--cell) * 0.62);
+}
+
+/* The hit area: a diamond from dot to dot and from box middle to box middle. */
+.db-line::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--cell);
+  height: var(--cell);
+  translate: -50% -50%;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* A faint line where it would go, in the colour of whoever's turn it is. */
+.db-line::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: var(--ink-c);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease);
+}
+
+.db-line[data-dir='across']::after {
+  width: calc(var(--cell) - var(--dot));
+  height: var(--pen);
+}
+
+.db-line[data-dir='down']::after {
+  width: var(--pen);
+  height: calc(var(--cell) - var(--dot));
+}
+
+@media (hover: hover) {
+  .db-line:not([aria-disabled]):hover::after {
+    opacity: 0.35;
+  }
+}
+
+.db-line:focus-visible::after {
+  opacity: 0.5;
+}
+
+.db-line:not([aria-disabled]):active::after {
+  opacity: 0.7;
+}
+
+.db-line[aria-disabled] {
+  cursor: default;
+}
+
+/* ---------- Lines drawn ---------- */
+
+.db-ink {
+  z-index: 2;
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: var(--ink-c);
+  pointer-events: none;
+}
+
+.db-ink[data-dir='across'] {
+  left: calc((var(--c) + 0.5) * 100% / var(--n));
+  top: calc(var(--r) * 100% / var(--n));
+  width: var(--cell);
+  height: var(--pen);
+}
+
+.db-ink[data-dir='down'] {
+  left: calc(var(--c) * 100% / var(--n));
+  top: calc((var(--r) + 0.5) * 100% / var(--n));
+  width: var(--pen);
+  height: var(--cell);
+}
+
+/* The newest line has a soft halo, so it's easy to see what just happened. */
+.db-ink[data-last] {
+  box-shadow: 0 0 0 calc(var(--pen) * 0.7) color-mix(in srgb, var(--ink-c) 25%, transparent);
+}
+
+/* New lines are drawn in, as if by pencil. */
+.db-ink[data-fresh][data-dir='across'] {
+  animation: db-draw-across 300ms var(--ease) both;
+}
+
+.db-ink[data-fresh][data-dir='down'] {
+  animation: db-draw-down 300ms var(--ease) both;
+}
+
+@keyframes db-draw-across {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes db-draw-down {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ---------- The end ---------- */
+
+.db-result {
+  width: 100%;
+  max-width: 34rem;
+}

@@ -1,0 +1,516 @@
+/*
+ * Snakes and Ladders: a bright paper board in a wooden tray, wooden ladders
+ * and friendly snakes drawn over it, round counters in each player's colour,
+ * and a big die that tumbles. The board keeps its daytime paper colours in
+ * dark mode, like a real board on the table.
+ */
+
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  align-items: stretch;
+}
+
+/* ---------- Status and where everyone is ---------- */
+
+.sl-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.sl-news {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+.sl-where {
+  gap: 0.4rem;
+}
+
+.sl-where .vs-seat {
+  padding-right: 0.8rem;
+}
+
+/* ---------- Colours of counters and dice: daytime colours on the paper board, whatever the scheme ---------- */
+
+.sl [data-colour='sky'] { --tc: #2b64a3; --tt: #dceaf7; }
+.sl [data-colour='meadow'] { --tc: #3a7332; --tt: #def0d6; }
+.sl [data-colour='sunflower'] { --tc: #875d00; --tt: #fbefc4; }
+.sl [data-colour='apricot'] { --tc: #a84f1a; --tt: #fde2cd; }
+.sl [data-colour='rose'] { --tc: #a8355a; --tt: #f9dce3; }
+.sl [data-colour='lilac'] { --tc: #6646a6; --tt: #e9e0f6; }
+.sl [data-colour='sea'] { --tc: #1c6f68; --tt: #d5efec; }
+.sl [data-colour='slate'] { --tc: #48525f; --tt: #e3e6ea; }
+
+/* ---------- The board ---------- */
+
+.sl-table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* The wooden tray is a shadow, so the layers inside keep exactly the board's shape. */
+.sl-board {
+  position: relative;
+  flex: none;
+  width: min(100% - 1.2rem, calc(58dvh * var(--cols) / var(--rows)), 36rem);
+  aspect-ratio: var(--cols) / var(--rows);
+  margin: 0.6rem;
+  container-type: inline-size;
+  border-radius: 0.35rem;
+  background: #fffaf0;
+  box-shadow:
+    0 0 0 2px #8b6440,
+    0 0 0 0.6rem #6d4a2c,
+    0 calc(0.6rem + 2px) 0 0.6rem #4f341e,
+    0 1.2rem 2.4rem -0.8rem rgb(40 25 10 / 0.5);
+  user-select: none;
+}
+
+:root[data-scheme='dark'] .sl-board {
+  filter: brightness(0.93);
+}
+
+.sl-squares {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.sl-squares::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/textures/paper-light.png');
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.sl-sq {
+  position: relative;
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 0.5px rgb(120 90 50 / 0.22);
+  transition: background-color var(--motion) var(--ease);
+}
+
+.sl-sq[data-tone='0'] { background: #dceaf7; }
+.sl-sq[data-tone='1'] { background: #def0d6; }
+.sl-sq[data-tone='2'] { background: #fbefc4; }
+.sl-sq[data-tone='3'] { background: #f9dce3; }
+.sl-sq[data-tone='4'] { background: #e9e0f6; }
+.sl-sq[data-tone='5'] { background: #fde2cd; }
+.sl-sq[data-tone='6'] { background: #d5efec; }
+
+/* A square being counted lights up. */
+.sl-sq[data-lit] {
+  background: #ffe27a;
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) #e0a100;
+}
+
+/* The numbers sit in their own grid above the ladders and snakes, on a little paper tab
+   so they still read where a rung or a body crosses the corner. */
+.sl-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  pointer-events: none;
+}
+
+.sl-labels > div {
+  position: relative;
+}
+
+.sl-num {
+  position: absolute;
+  left: 4%;
+  top: 3%;
+  padding: 0.1em 0.25em;
+  border-radius: 0.35em;
+  background: rgb(255 250 240 / 0.82);
+  font-size: max(0.6rem, calc(28cqw / var(--cols)));
+  font-weight: 750;
+  line-height: 1;
+  color: #4a3b28;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-goal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(42cqw / var(--cols));
+  line-height: 1;
+}
+
+/* ---------- Ladders and snakes ---------- */
+
+.sl-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sl-ladder-shade line {
+  stroke: rgb(60 40 20 / 0.2);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.sl-rail-edge,
+.sl-rung-edge {
+  stroke: #6b4120;
+  stroke-linecap: round;
+}
+
+.sl-rail-edge {
+  stroke-width: 10;
+}
+
+.sl-rung-edge {
+  stroke-width: 8;
+}
+
+.sl-rail {
+  stroke: #c4843f;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.sl-rung {
+  stroke: #e3ad69;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.sl-snake[data-tone='0'] { --body: #5cb85c; --line: #2f6f2f; --spot: #d4f0b0; }
+.sl-snake[data-tone='1'] { --body: #9a6ad8; --line: #553296; --spot: #e6d6fa; }
+.sl-snake[data-tone='2'] { --body: #f08a3c; --line: #9c4d15; --spot: #ffe0b8; }
+.sl-snake[data-tone='3'] { --body: #3f8fd6; --line: #1d5690; --spot: #d2e8fb; }
+.sl-snake[data-tone='4'] { --body: #e5679a; --line: #9a2f5c; --spot: #fdd5e5; }
+
+.sl-snake-shade {
+  fill: rgb(60 40 20 / 0.16);
+}
+
+.sl-snake-body {
+  fill: var(--body);
+  stroke: var(--line);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.sl-snake-spot {
+  fill: var(--spot);
+}
+
+.sl-snake-head {
+  fill: var(--body);
+  stroke: var(--line);
+  stroke-width: 3;
+}
+
+.sl-snake-eye {
+  fill: #fff;
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.sl-snake-pupil {
+  fill: #1f2023;
+}
+
+.sl-snake-cheek {
+  fill: #ff8fa8;
+  opacity: 0.65;
+}
+
+.sl-snake-smile {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* ---------- Counting the hops: the numbers sit above the counters ---------- */
+
+.sl-counts {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.sl-count {
+  position: absolute;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: calc(42cqw / var(--cols));
+  min-width: 1.15rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #c2410c;
+  color: #fff;
+  border: 2px solid #fff;
+  font-size: max(0.7rem, calc(24cqw / var(--cols)));
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.3);
+  animation: sl-pop 200ms var(--ease);
+}
+
+/* ---------- Counters ---------- */
+
+.sl-tokens {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sl-token {
+  position: absolute;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: calc(var(--s) * 100% / var(--cols));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fff 0 10%, var(--tt) 42%);
+  border: max(2px, 0.55cqw) solid var(--tc);
+  box-shadow:
+    0 max(2px, 0.4cqw) 0 color-mix(in srgb, var(--tc) 65%, #000),
+    0 max(3px, 0.8cqw) max(4px, 1.2cqw) -0.1cqw rgb(0 0 0 / 0.4);
+  color: var(--tc);
+  font-size: calc(var(--s) * 52cqw / var(--cols));
+  font-weight: 800;
+  line-height: 1;
+  transition:
+    left 220ms var(--ease),
+    top 220ms var(--ease);
+}
+
+.sl-token[data-moving] {
+  z-index: 2;
+}
+
+.sl-token[data-hop='a'] {
+  animation: sl-hop-a 260ms var(--ease);
+}
+
+.sl-token[data-hop='b'] {
+  animation: sl-hop-b 260ms var(--ease);
+}
+
+/* Two copies, so each hop starts the animation afresh. */
+@keyframes sl-hop-a {
+  45% {
+    transform: translateY(-38%) scale(1.08);
+  }
+}
+
+@keyframes sl-hop-b {
+  45% {
+    transform: translateY(-38%) scale(1.08);
+  }
+}
+
+.sl-token-mini {
+  position: static;
+  translate: none;
+  flex: none;
+  width: 2rem;
+  border-width: 2px;
+  font-size: 1.05rem;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--tc) 65%, #000);
+  transition: none;
+}
+
+/* ---------- The die and the Roll button ---------- */
+
+.sl-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  width: 100%;
+  min-height: 6rem;
+}
+
+.sl-die-spot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 6.5rem;
+}
+
+.sl-die {
+  --tc: #48525f;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  width: 4.25rem;
+  aspect-ratio: 1;
+  padding: 0.55rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(150deg, #ffffff 0%, #f4efe5 100%);
+  border: 3px solid var(--tc);
+  box-shadow:
+    0 4px 0 var(--tc),
+    0 14px 18px -10px rgb(0 0 0 / 0.5);
+}
+
+.sl-die[data-rolling] {
+  animation: sl-tumble 520ms linear infinite;
+}
+
+.sl-pip {
+  width: 74%;
+  aspect-ratio: 1;
+  place-self: center;
+  border-radius: 50%;
+  background: #1f2023;
+  box-shadow: inset 0 -1.5px 0 rgb(255 255 255 / 0.25);
+}
+
+@keyframes sl-tumble {
+  0% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(85deg) translateY(-12px);
+  }
+  50% {
+    transform: rotate(180deg) translateY(0);
+  }
+  75% {
+    transform: rotate(275deg) translateY(-6px);
+  }
+  100% {
+    transform: rotate(360deg) translateY(0);
+  }
+}
+
+.sl-die-line {
+  min-height: 1.3em;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--muted);
+  text-align: center;
+}
+
+.sl-dock-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 10rem;
+  text-align: center;
+}
+
+.sl-roll {
+  min-height: 3.5rem;
+  min-width: 9rem;
+  font-size: var(--text-xl);
+}
+
+.sl-wait,
+.sl-exact {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.sl-exact {
+  font-weight: 650;
+}
+
+/* What just happened, in a few words beside the die. */
+.sl-say {
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--edge);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 750;
+  box-shadow: var(--shadow-sheet);
+  transform: rotate(-1.2deg);
+  animation: sl-pop 240ms var(--ease);
+}
+
+.sl-say[data-kind='up'] {
+  background: var(--success-soft);
+  border-color: var(--success);
+}
+
+.sl-say[data-kind='down'] {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.sl-say[data-kind='bounce'] {
+  background: var(--warning-soft);
+  border-color: var(--warning);
+}
+
+.sl-say[data-kind='end'] {
+  background: var(--sunflower-tint);
+  border-color: var(--sunflower);
+}
+
+@keyframes sl-pop {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+/* A landscape tablet or a desktop: the die and button sit beside the board. */
+@media (min-width: 50rem) and (orientation: landscape) {
+  .sl-table {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .sl-board {
+    width: min(100% - 12.5rem, calc(66dvh * var(--cols) / var(--rows)), 36rem);
+  }
+
+  .sl-dock {
+    flex: none;
+    flex-direction: column;
+    width: 10rem;
+  }
+
+  .sl-dock-main {
+    min-width: 0;
+  }
+}
+
+.sl-roll[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}

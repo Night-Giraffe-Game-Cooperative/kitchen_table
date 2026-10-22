@@ -77,6 +77,12 @@ export interface GameDef<S = any, O = any> {
   Board: ComponentType<GameProps<S>>;
   /** One short line about where the game is at, for lists and chat cards. */
   status?: (game: Game<S>, me: number, people: Map<number, Person>) => string;
+  /**
+   * Whether the game is waiting on this person, for games everyone plays in
+   * their own time (turn 'anyone'), so it shows under "Your turn". Games with
+   * seats taking turns don't need it.
+   */
+  waitingOn?: (game: Game<S>, me: number) => boolean;
   /** How to play, from the book button above the board. */
   guide?: GuideSection[];
 }
