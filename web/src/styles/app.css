@@ -802,6 +802,11 @@ button {
   text-align: center;
 }
 
+.auth-privacy {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 /* ---------- App frame ---------- */
 
 .app {

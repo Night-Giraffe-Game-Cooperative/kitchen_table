@@ -433,3 +433,12 @@ one is kept. Signing in comes back to the browser that started it and checks
 it's the same person, so nobody can attach their own Google account to
 someone else's Kitchen Table. An account nobody links a calendar from is
 let go after an hour, and Google is told to forget it.
+
+22 Oct 2026. A privacy page. Google won't publish an app that signs people
+in to Google without a privacy policy on the app's own domain, so every
+Kitchen Table has one at `/privacy`, readable without signing in and linked
+from the sign-in screen and Me. It's plain words about what this app does:
+what it keeps and where, that calls aren't recorded, and exactly what
+linked calendars are used for, with the Limited Use statement Google's User
+Data Policy asks for. It names nobody, as each family runs its own copy;
+questions go to whoever set it up.

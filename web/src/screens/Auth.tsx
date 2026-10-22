@@ -11,6 +11,9 @@ function AuthLayout({ appName, children }: { appName: string; children: ReactNod
         <p className="auth-name">{appName}</p>
       </div>
       <div className="auth-card sheet">{children}</div>
+      <a className="auth-privacy" href="/privacy">
+        Privacy
+      </a>
     </main>
   );
 }

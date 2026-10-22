@@ -359,7 +359,10 @@ function YourData() {
   return (
     <section className="panel sheet">
       <h2>Your things</h2>
-      <p className="muted">A zip of everything the app keeps about you: your messages, photos and doodles, calendar, tasks and rewards.</p>
+      <p className="muted">
+        A zip of everything the app keeps about you: your messages, photos and doodles, calendar, tasks and rewards.{' '}
+        <a href="/privacy">How the app looks after them</a>
+      </p>
       <div className="row row-wrap">
         <a className="btn btn-secondary btn-md" href="/api/export/me" download>
           <Icon name="download" size={20} />

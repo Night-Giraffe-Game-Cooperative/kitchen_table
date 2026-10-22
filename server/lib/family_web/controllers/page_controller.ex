@@ -1,6 +1,18 @@
 defmodule FamilyWeb.PageController do
   use FamilyWeb, :controller
 
+  @doc """
+  What the app keeps and what it does with linked calendars, in plain words.
+  A page of its own, so Google and Microsoft can link to it from their
+  sign-in screens and anyone can read it without signing in.
+  """
+  def privacy(conn, _params) do
+    conn
+    |> put_resp_header("cache-control", "public, max-age=3600")
+    |> put_resp_content_type("text/html")
+    |> send_resp(200, FamilyWeb.Privacy.page())
+  end
+
   # Every other address gets the web app, which does its own routing.
   def index(conn, %{"path" => path}) do
     index = Application.app_dir(:family, "priv/static/index.html")

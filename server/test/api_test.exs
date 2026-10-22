@@ -1,6 +1,12 @@
 defmodule FamilyWeb.ApiTest do
   use FamilyWeb.ConnCase, async: false
 
+  test "the privacy page is there for anyone, signed in or not", %{conn: conn} do
+    html = conn |> get("/privacy") |> html_response(200)
+    assert html =~ "<title>Privacy · Kitchen Table</title>"
+    assert html =~ "Limited Use requirements"
+  end
+
   test "setup, sign-in, forced password change, and the header check", %{conn: conn} do
     assert %{"needed" => true} = conn |> get("/api/setup") |> json_response(200)
 

@@ -32,15 +32,19 @@ every device shows it.
    `.../auth/calendar.events` and `.../auth/calendar.calendarlist.readonly`.
    Kitchen Table sees and changes events, and lists the calendars to choose
    from; it can't share calendars or delete them.
-5. Under **Audience**, choose **Publish app**. Until it's published, Google
+5. Under **Branding**, put in your Kitchen Table address as the home page,
+   the same address with `/privacy` on the end as the privacy policy (every
+   Kitchen Table has that page), and its domain, such as `example.org`,
+   under **Authorized domains**. Google won't publish the app without them.
+6. Under **Audience**, choose **Publish app**. Until it's published, Google
    signs people out of it after seven days. Google won't check the app unless
    you ask it to, which a family doesn't need: up to 100 people can use an
    unchecked app, and Google shows them a warning first. They choose
    **Advanced**, then **Go to Kitchen Table**.
-6. Under **Clients**, choose **Create client**, then **Web application**. Add
+7. Under **Clients**, choose **Create client**, then **Web application**. Add
    the Google address from above under **Authorized redirect URIs**, and
    create it.
-7. Copy the **Client ID** and **Client secret** straight away (Google may not
+8. Copy the **Client ID** and **Client secret** straight away (Google may not
    show the secret again) and paste them into Kitchen Table.
 
 ## Microsoft (Outlook.com, Hotmail and Microsoft 365)

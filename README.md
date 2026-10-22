@@ -219,6 +219,10 @@ shown here and changed where it's kept. Whoever links a calendar chooses
 whether the family sees it or only they do. See
 [Linked calendars](docs/getting-started.md#7-linked-calendars) in the guide.
 
+**Privacy.** `/privacy` says in plain words what the app keeps, where, and
+what it does with linked calendars. Anyone can read it without signing in,
+and Google needs it before Kitchen Table can be published there.
+
 **Notifications.** Each phone, tablet or computer can switch them on from
 Me. A new message, a call ringing (then "Missed call" if nobody answered) and
 your turn in a game pop up while the app is closed. Nothing pops up on any of

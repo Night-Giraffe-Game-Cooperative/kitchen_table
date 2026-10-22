@@ -128,6 +128,7 @@ defmodule FamilyWeb.Router do
     get "/media/:key", MediaController, :show
     # Google and Microsoft send people back here after signing in.
     get "/calendar-connect/:provider", CalendarConnectController, :back
+    get "/privacy", PageController, :privacy
     get "/*path", PageController, :index
   end
 end
