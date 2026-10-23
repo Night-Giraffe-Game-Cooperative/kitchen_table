@@ -261,6 +261,14 @@ another of your devices, messages in one chat join into one notification, and
 kids' quiet hours keep their devices quiet. The bell at the top of a chat
 mutes just that chat.
 
+Grown-ups also get a **morning summary** at seven: what's on that day, what
+the kids need to remember, homework that's due and how many jobs there are.
+At eight in the evening an **evening summary** says the same about tomorrow
+(without the jobs), so PE kit and forms can go by the door the night before.
+Tapping either opens Today. Change their times or switch them off under Me,
+below Notifications. Kids can switch on their own there too. A day with
+nothing on sends nothing, and quiet hours hold them back until they end.
+
 Notifications need the app online with a proper certificate (see the next
 part). On an iPhone or iPad, add Kitchen Table to the Home Screen first and
 open it from there (iOS 16.4 or later).

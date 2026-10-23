@@ -153,7 +153,9 @@ defmodule FamilyWeb.Present do
       must_change_password: u.must_change_password,
       permissions: Permissions.effective(u),
       quiet_hours: u.quiet_hours,
-      quiet_now: Permissions.quiet_now?(u)
+      quiet_now: Permissions.quiet_now?(u),
+      morning: Family.DaySummary.time(u, :morning),
+      evening: Family.DaySummary.time(u, :evening)
     })
   end
 

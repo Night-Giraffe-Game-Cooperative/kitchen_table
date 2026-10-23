@@ -230,7 +230,10 @@ your devices while you're using the app on one of them, so the phone stays
 quiet while the tablet's in your hands. Messages in one chat join up into one
 notification. Quiet hours keep a kid's devices quiet, the bell at the top of a
 chat mutes just that chat, and signing out of a device stops its
-notifications. On an iPhone or iPad they need the app on the Home Screen
+notifications. Each morning, grown-ups get a summary of the day (what's on,
+what to remember, homework due, jobs) that opens Today, and at eight in the
+evening one about tomorrow; anyone can change their times or switch either
+off. On an iPhone or iPad they need the app on the Home Screen
 first (iOS 16.4 or later). See [Notifications](docs/getting-started.md#8-notifications) in the guide.
 
 **Your things.** Anyone can download what's theirs from Me: their messages,

@@ -74,6 +74,10 @@ export interface Me extends Person {
   permissions: Record<Permission, boolean>;
   quiet_hours: QuietHours | null;
   quiet_now: boolean;
+  /** When the morning summary comes, "07:00", or null if it doesn't. */
+  morning: string | null;
+  /** When the evening summary of tomorrow comes, "20:00", or null if it doesn't. */
+  evening: string | null;
 }
 
 export interface Media {

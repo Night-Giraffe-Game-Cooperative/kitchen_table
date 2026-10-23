@@ -977,7 +977,22 @@ test('notifications: on for a phone, a message pops up while the app is closed, 
     await mum.getByRole('button', { name: 'Send a test' }).click();
     await expect.poll(() => push.received.length).toBe(1);
     expect(push.open(push.received[0])).toMatchObject({ kind: 'test', body: 'Notifications work on this device.' });
-    await mum.getByRole('heading', { name: 'Notifications' }).scrollIntoViewIfNeeded();
+
+    // Grown-ups get a morning summary at seven and tomorrow's at eight in the evening.
+    // Mum moves the morning one to half past six and switches the evening one off.
+    await expect(mum.getByRole('switch', { name: 'Morning summary' })).toHaveAttribute('aria-checked', 'true');
+    await expect(mum.getByRole('switch', { name: 'Evening summary' })).toHaveAttribute('aria-checked', 'true');
+    await expect(mum.getByLabel('Evening time')).toHaveValue('20:00');
+    await mum.getByLabel('Morning time').fill('06:30');
+    await mum.getByLabel('Morning time').blur();
+    await expect.poll(async () => (await (await mum.request.get('/api/me')).json()).me.morning).toBe('06:30');
+    await mum.getByRole('switch', { name: 'Evening summary' }).click();
+    await expect(mum.getByLabel('Evening time')).toHaveCount(0);
+    expect((await (await mum.request.get('/api/me')).json()).me).toMatchObject({ morning: '06:30', evening: null });
+    await mum.getByRole('switch', { name: 'Evening summary' }).click();
+    await expect(mum.getByLabel('Evening time')).toHaveValue('20:00');
+    while (await mum.locator('.toast-close').count()) await mum.locator('.toast-close').first().click();
+    await mum.getByRole('switch', { name: 'Evening summary' }).scrollIntoViewIfNeeded();
     await shot(mum, '38-notifications');
 
     // Mum puts her phone away; Alex writes in the family chat.

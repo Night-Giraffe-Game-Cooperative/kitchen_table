@@ -16,6 +16,13 @@ defmodule Family.Accounts.User do
     field :avatar, :string, default: "🙂"
     field :permissions, :map, default: %{}
     field :quiet_hours, :map
+    # When the morning and evening summaries come (Family.DaySummary):
+    # "07:00", "off", or nil for the usual, which is seven and eight in the
+    # evening for grown-ups, and never for kids unless they choose a time.
+    field :morning, :string
+    field :morning_sent_on, :date
+    field :evening, :string
+    field :evening_sent_on, :date
     field :active, :boolean, default: true
     field :last_seen_at, :utc_datetime
     belongs_to :bubble, Family.Accounts.Bubble
@@ -37,9 +44,11 @@ defmodule Family.Accounts.User do
 
   def profile_changeset(user, attrs) do
     user
-    |> cast(attrs, [:name, :colour, :avatar])
+    |> cast(attrs, [:name, :colour, :avatar, :morning, :evening])
     |> validate_required([:name])
     |> validate_profile()
+    |> validate_format(:morning, ~r/\A(off|([01]\d|2[0-3]):[0-5]\d)\z/, message: "needs to be a time, like 07:00")
+    |> validate_format(:evening, ~r/\A(off|([01]\d|2[0-3]):[0-5]\d)\z/, message: "needs to be a time, like 20:00")
   end
 
   def admin_changeset(user, attrs) do

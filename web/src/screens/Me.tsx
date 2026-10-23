@@ -253,11 +253,83 @@ function Notifications() {
           </ul>
         </div>
       )}
+      {(state === 'on' || devices.length > 0) && (
+        <>
+          <DaySummary kind="morning" />
+          <DaySummary kind="evening" />
+        </>
+      )}
       <p className="muted">
         {me.quiet_hours ? `Quiet hours keep your devices quiet from ${me.quiet_hours.from} to ${me.quiet_hours.to}. ` : ''}
         To mute one chat, tap the bell at the top of it.
       </p>
     </section>
+  );
+}
+
+const summaries = {
+  morning: {
+    label: 'Morning summary',
+    time: 'Morning time',
+    usual: '07:00',
+    kid: "What's on today, your jobs and homework due, each morning. Tap it to see Today.",
+    grownup:
+      "What's on today, what the family needs to remember, homework due and jobs, each morning. Tap it to see Today. Days with nothing on stay quiet.",
+  },
+  evening: {
+    label: 'Evening summary',
+    time: 'Evening time',
+    usual: '20:00',
+    kid: "What's on tomorrow and homework due, the evening before, so bags get packed tonight.",
+    grownup:
+      "What's on tomorrow, what to remember and homework due, the evening before, so kit and forms are ready. Tap it to see Today. Quiet days stay quiet.",
+  },
+} as const;
+
+/** The day summaries: what's on, what to remember and homework due, at a time each person chooses. */
+function DaySummary({ kind }: { kind: keyof typeof summaries }) {
+  const { me, setMe, toast } = useStore();
+  const text = summaries[kind];
+  const [time, setTime] = useState(me[kind] ?? text.usual);
+  const [busy, setBusy] = useState(false);
+
+  async function save(value: string) {
+    setBusy(true);
+    try {
+      setMe((await api.patch<{ me: Me }>('/api/me', { [kind]: value })).me);
+    } catch (e) {
+      toast((e as Error).message, 'danger');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <hr className="rule" />
+      <Toggle
+        label={text.label}
+        hint={me.role === 'kid' ? text.kid : text.grownup}
+        checked={me[kind] !== null}
+        onChange={(on) => save(on ? time : 'off')}
+        disabled={busy}
+      />
+      {me[kind] !== null && (
+        <div className="row row-wrap">
+          <Field label={text.time}>
+            {(p) => (
+              <Input
+                {...p}
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                onBlur={() => time && time !== me[kind] && save(time)}
+              />
+            )}
+          </Field>
+        </div>
+      )}
+    </>
   );
 }
 

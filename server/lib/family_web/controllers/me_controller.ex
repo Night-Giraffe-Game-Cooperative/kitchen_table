@@ -19,7 +19,7 @@ defmodule FamilyWeb.MeController do
   end
 
   def update(conn, params) do
-    with {:ok, user} <- Accounts.update_profile(conn.assigns.current_user, Map.take(params, ~w(name colour avatar))) do
+    with {:ok, user} <- Accounts.update_profile(conn.assigns.current_user, Map.take(params, ~w(name colour avatar morning evening))) do
       json(conn, %{me: Present.me(user)})
     end
   end

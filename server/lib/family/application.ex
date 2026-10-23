@@ -18,6 +18,7 @@ defmodule Family.Application do
       Family.Games.Tidy,
       Family.Calls,
       Family.Calendar.Links.Sync,
+      Family.DaySummary,
       FamilyWeb.Presence,
       FamilyWeb.Endpoint
     ]

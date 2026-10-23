@@ -58,7 +58,7 @@ defmodule Family.Push do
       # A browser that renewed its subscription says which one it replaces.
       replaced = is_binary(attrs["replaces"]) && Repo.one(from s in Subscription, where: s.endpoint == ^attrs["replaces"] and s.user_id == ^user.id)
       if replaced, do: Repo.delete!(replaced)
-      device = device_name(attrs["device"]) || (replaced && replaced.device)
+      device = device_name(attrs["device"]) || if(replaced, do: replaced.device)
 
       Repo.insert!(
         %Subscription{user_id: user.id, token_id: token_id, endpoint: endpoint, p256dh: p256dh, auth: auth, device: device},
@@ -231,6 +231,18 @@ defmodule Family.Push do
       )
     end)
   end
+
+  @doc "A morning or evening summary (Family.DaySummary), on all of someone's devices. Its own timing already took quiet hours into account."
+  def day_summary(%User{} = user, kind, %{title: title, body: body}) when kind in [:morning, :evening] do
+    payload = %{kind: to_string(kind), title: title, body: body, tag: to_string(kind), url: "/#/calendar", at: System.system_time(:millisecond)}
+
+    for sub <- Repo.all(from s in live(), where: s.user_id == ^user.id), do: send_one(sub, payload, topic: to_string(kind), ttl: 4 * 3600)
+
+    :ok
+  end
+
+  @doc "The people with at least one device to send notifications to."
+  def with_devices, do: from(s in live(), select: s.user_id)
 
   @doc "News about the family, such as two kids asking to chat."
   def family_news(user_ids, title, body) do

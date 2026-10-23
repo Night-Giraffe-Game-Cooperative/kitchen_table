@@ -442,3 +442,21 @@ what it keeps and where, that calls aren't recorded, and exactly what
 linked calendars are used for, with the Limited Use statement Google's User
 Data Policy asks for. It names nobody, as each family runs its own copy;
 questions go to whoever set it up.
+
+23 Oct 2026. A morning summary. One notification a day saying what the day
+holds, so nobody has to open the app to find out: the calendar, the kids'
+reminders, homework due and a count of jobs, ending in a tap through to
+Today, which already shows all of it. Grown-ups get their household's at
+seven by default, because that's who keeps track; kids only get their own
+if they choose a time. It's worked out on the server at send time, with
+repeats done the way the web app does them, in the family's own time. A
+day with nothing on sends nothing rather than "Nothing today". Quiet hours
+hold it back, but one more than four hours late is dropped (and the push
+service is told it's stale after four hours), as a lunchtime "good
+morning" is worse than none.
+
+23 Oct 2026. An evening summary of tomorrow. The same notification at eight
+the evening before, because seven in the morning is too late to find the PE
+kit or sign a form. It leaves out the jobs (they're done on the day) and
+says "Tomorrow" in the title. It shares the morning one's code, defaults and
+rules, with its own time and switch, so either can go without the other.
