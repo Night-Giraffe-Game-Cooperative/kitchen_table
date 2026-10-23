@@ -7,11 +7,14 @@ defmodule Family.Tasks do
   homework, set on one day, due on another, and moved along from to do to
   handed in. A child never sees the reminders grown-ups set about them.
 
-  Everyone sees the tasks of the people in their own bubble, so a household
-  has one chart; admins see everyone's. Anyone can set tasks for themselves,
-  grown-ups who look after kids set them for those kids, and admins for
-  anyone. Kids only change the tasks they set themselves. A task is ticked
-  off by its person, or by a grown-up who looks after them. Days are the
+  Grown-ups see the tasks of the people in their own bubble, so a household
+  has one chart; admins see everyone's; kids see only their own. Anyone can
+  set tasks for themselves, grown-ups who look after kids set them for those
+  kids, and admins for anyone. Kids only change the tasks they set
+  themselves. A task is ticked off by its person, or by a grown-up who looks
+  after them. When a kid ticks off a task a grown-up set (or hands in their
+  homework), it waits for a grown-up to check it: only then is it done for
+  real and earns its reward. Days are the
   family's own: the web app says which day it is. Tasks are a feature the
   home family can switch off for another bubble, and people without it
   neither see tasks nor get them.
@@ -49,13 +52,14 @@ defmodule Family.Tasks do
   def can_set?(_, _), do: false
 
   @doc """
-  The tasks someone can see, and the ticks between two days. Reminders show
-  only to grown-ups in the child's own bubble, and homework handed in long
-  before these days is left out. Kids don't see what their brothers and
-  sisters are paid.
+  The tasks someone can see, and the ticks between two days. Kids see only
+  their own. Reminders show only to grown-ups in the child's own bubble, and
+  homework handed in long before these days is left out.
   """
   def list(%User{} = user, %Date{} = from, %Date{} = to) do
     visible = visible_ids(user)
+    kid = user.role == "kid"
+    mine = if kid, do: Enum.filter(visible, &(&1 == user.id)), else: visible
     reminded = reminded_ids(user, visible)
     long_ago = Date.add(from, -30)
 
@@ -65,8 +69,8 @@ defmodule Family.Tasks do
       |> Enum.map(fn t ->
         people =
           cond do
-            t.kind != "reminder" -> visible
-            user.role == "kid" -> if t.created_by_id == user.id and user.id in visible, do: [user.id], else: []
+            t.kind != "reminder" -> mine
+            kid -> if t.created_by_id == user.id, do: mine, else: []
             true -> reminded
           end
 
@@ -75,17 +79,30 @@ defmodule Family.Tasks do
       |> Enum.reject(&(&1.user_ids == []))
 
     ids = Enum.map(tasks, & &1.id)
+    done = Repo.all(from c in Completion, where: c.task_id in ^ids and c.user_id in ^mine and c.on >= ^from and c.on <= ^to, order_by: c.id)
+    {tasks, done}
+  end
 
-    done =
-      Repo.all(from c in Completion, where: c.task_id in ^ids and c.user_id in ^visible and c.on >= ^from and c.on <= ^to, order_by: c.id)
+  @doc """
+  Kids' ticks waiting for this grown-up to check, from the last two weeks,
+  oldest first, each with its task. Kids check nobody's.
+  """
+  def to_check(%User{role: "kid"}), do: []
 
-    if user.role == "kid" do
-      {Enum.map(tasks, &if(user.id in &1.user_ids, do: &1, else: %{&1 | pence: 0})),
-       Enum.map(done, &if(&1.user_id == user.id, do: &1, else: %{&1 | pence: 0}))}
+  def to_check(%User{} = user) do
+    if Permissions.can?(user, :tasks) do
+      since = Date.add(today(), -14)
+
+      Repo.all(from c in Completion, where: c.waiting and c.on >= ^since, order_by: [asc: c.on, asc: c.id], preload: [:task, :user])
+      |> Enum.filter(&(&1.user_id != user.id and &1.user.active and can_set?(user, &1.user)))
     else
-      {tasks, done}
+      []
     end
   end
+
+  @doc "Whether a tick by someone waits for a grown-up: a kid's, on a task they didn't set themselves."
+  def needs_check?(%User{role: "kid", id: id}, %Task{created_by_id: by}), do: by != id
+  def needs_check?(_, _), do: false
 
   # Reminders are for the grown-ups of the children in their own bubble, and
   # kids see only the ones they set themselves.
@@ -143,16 +160,52 @@ defmodule Family.Tasks do
          :ok <- uses_tasks(person),
          true <- due?(task, on) || {:error, "That task isn't for that day."} do
       existing = Repo.get_by(Completion, task_id: task.id, user_id: person.id, on: on)
+      check = needs_check?(actor, task)
 
       cond do
+        # A kid's tick waits for a grown-up; anyone else's counts straight away.
         done? and is_nil(existing) ->
-          Repo.insert!(earned(%Completion{task_id: task.id, user_id: person.id, on: on, done_by_id: actor.id}, task))
+          tick = %Completion{task_id: task.id, user_id: person.id, on: on, done_by_id: actor.id}
+          Repo.insert!(if check, do: %{tick | waiting: true, stars: 0, pence: 0}, else: earned(tick, task))
+          changed([person.id])
 
-        not done? and existing ->
+        # A grown-up ticking a waiting tick says it's done for real.
+        done? and existing.waiting and not check ->
+          Repo.update!(confirmed(existing, task))
+          changed([person.id])
+
+        not done? and existing != nil and check and not existing.waiting ->
+          {:error, "A grown-up has checked this one, so only they can untick it."}
+
+        not done? and existing != nil ->
           Repo.delete!(existing)
+          changed([person.id])
 
         true ->
           :ok
+      end
+    end
+  end
+
+  @doc """
+  A grown-up looks at a kid's waiting tick: yes, it's done, and it earns its
+  reward; or not yet, and the tick goes (homework goes back to done).
+  """
+  def check(%User{} = actor, task_id, person_id, %Date{} = on, ok?) do
+    with :ok <- uses_tasks(actor),
+         true <- actor.role != "kid" || {:error, :forbidden},
+         %Task{} = task <- Repo.get(Task, task_id) || {:error, :not_found},
+         %User{} = person <- Accounts.get_user(person_id) || {:error, :not_found},
+         true <- (person.id != actor.id and can_set?(actor, person)) || {:error, :forbidden},
+         tick = Repo.get_by(Completion, task_id: task.id, user_id: person.id, on: on),
+         true <- (tick != nil and tick.waiting) || {:error, "That's been checked already."} do
+      if ok? do
+        Repo.update!(confirmed(tick, task))
+      else
+        Repo.transaction(fn ->
+          Repo.delete!(tick)
+          if task.kind == "homework", do: task |> Ecto.Changeset.change(status: "done") |> Repo.update!()
+        end)
       end
 
       changed([person.id])
@@ -170,7 +223,11 @@ defmodule Family.Tasks do
          true <- task.kind == "homework" || {:error, "Only homework moves along like that."},
          true <- status in Task.statuses() || {:error, "That isn't a step homework can be at."},
          %User{} = person <- Accounts.get_user(hd(task.user_ids)) || {:error, :not_found},
-         true <- can_set?(actor, person) || {:error, :forbidden} do
+         true <- can_set?(actor, person) || {:error, :forbidden},
+         check = needs_check?(actor, task),
+         true <-
+           not (check and status != task.status and Repo.exists?(from c in Completion, where: c.task_id == ^task.id and not c.waiting)) ||
+             {:error, "A grown-up has checked this one, so only they can change it."} do
       if status == task.status do
         {:ok, task}
       else
@@ -178,9 +235,15 @@ defmodule Family.Tasks do
           Repo.transaction(fn ->
             task = task |> Ecto.Changeset.change(status: status) |> Repo.update!()
             Repo.delete_all(from c in Completion, where: c.task_id == ^task.id)
+            tick = %Completion{task_id: task.id, user_id: person.id, on: on, done_by_id: actor.id}
 
-            if status == "handed_in" and Date.compare(on, task.due_on) != :gt,
-              do: Repo.insert!(earned(%Completion{task_id: task.id, user_id: person.id, on: on, done_by_id: actor.id}, task))
+            # A kid's hand-in waits for a grown-up to check it, on time or not.
+            cond do
+              status != "handed_in" -> nil
+              check -> Repo.insert!(%{tick | waiting: true, stars: 0, pence: 0})
+              Date.compare(on, task.due_on) != :gt -> Repo.insert!(earned(tick, task))
+              true -> nil
+            end
 
             task
           end)
@@ -194,6 +257,16 @@ defmodule Family.Tasks do
   # What a tick earns: the task's stars and pocket money, and a sticker picked at random.
   defp earned(%Completion{} = c, %Task{} = task),
     do: %{c | stars: task.stars, pence: task.pence, sticker: if(task.sticker, do: Enum.random(@stickers))}
+
+  # A waiting tick made real, earning what it earns; homework only if it was handed in on time.
+  defp confirmed(%Completion{} = c, %Task{} = task) do
+    reward = if late?(c, task), do: %{c | stars: 0, pence: 0, sticker: nil}, else: earned(c, task)
+    Ecto.Changeset.change(c, waiting: false, stars: reward.stars, pence: reward.pence, sticker: reward.sticker)
+  end
+
+  @doc "Whether a hand-in came after the homework was due."
+  def late?(%Completion{on: on}, %Task{kind: "homework", due_on: %Date{} = due}), do: Date.compare(on, due) == :gt
+  def late?(_, _), do: false
 
   ## Rewards
 

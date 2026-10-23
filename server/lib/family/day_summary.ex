@@ -112,12 +112,15 @@ defmodule Family.DaySummary do
     jobs =
       for t <- tasks, t.kind == "job", due?(t, day), id <- t.user_ids, not MapSet.member?(ticked, {t.id, id}), do: {t, id}
 
+    checks = user |> Tasks.to_check() |> Enum.filter(&(&1.user_id in about)) |> length()
+
     lines =
       [
         events != [] && events |> Enum.map(&event_label(&1, day)) |> joined(),
         reminders != [] && "Remember: " <> (reminders |> Enum.map(&task_label(&1, names, user)) |> joined()),
         homework != [] && "Homework due: " <> (homework |> Enum.map(&task_label(&1, names, user)) |> joined()),
-        kind == :morning and jobs != [] && "✅ #{length(jobs)} job#{if length(jobs) == 1, do: "", else: "s"} to tick off"
+        kind == :morning and jobs != [] && "✅ #{length(jobs)} job#{if length(jobs) == 1, do: "", else: "s"} to tick off",
+        checks > 0 && "👀 #{checks} tick#{if checks == 1, do: "", else: "s"} from the kids to check"
       ]
       |> Enum.filter(&is_binary/1)
 

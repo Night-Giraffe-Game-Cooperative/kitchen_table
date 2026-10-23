@@ -460,3 +460,32 @@ the evening before, because seven in the morning is too late to find the PE
 kit or sign a form. It leaves out the jobs (they're done on the day) and
 says "Tomorrow" in the title. It shares the morning one's code, defaults and
 rules, with its own time and switch, so either can go without the other.
+
+23 Oct 2026. Kids see only their own tasks, and a grown-up checks their
+ticks. Seeing a brother's or sister's chart invited comparing and nagging,
+so a kid's lists hold only them (a shared task like feeding the cat shows
+as theirs alone). A kid's tick on a task a grown-up set, or their homework
+handed in, is kept but marked waiting: it earns nothing, shows half-ticked
+with an hourglass, and the kid can take it back. Grown-ups who look after
+them see it under To check on Today (and Homework), and in their morning
+and evening summaries, and say "Yes, done", which earns the reward then
+(homework only if it was handed in on time), or "Not yet", which removes
+the tick and puts homework back to done. Tapping a waiting tick on the
+chart also says yes. Once checked, only a grown-up can undo it. The tasks
+kids set themselves earn nothing, so they don't need checking.
+
+23 Oct 2026. Email from a mailbox an admin puts in. Setting `SMTP_` values
+on the server is beyond most families, so an admin can put in a mailbox
+under Emails sent by the app, with Gmail's settings filled in and steps for
+its app password. The password is sealed like a linked calendar's and never
+shown again. Saving sends a test email to the admin first and keeps the
+settings only if it goes, so a typo is found then, not when an invitation
+goes missing. The server's own settings still win, so a server set up that
+way doesn't change.
+
+23 Oct 2026. Games keep out of the chat. Each game posted a card when it
+started and a line when it finished or stopped, which filled a busy family
+chat with game news. Now the chat shows the games going on in it as a slim
+strip above the messages (up to three, then "N more"), highlighted when it's
+your go, and the people given a seat get a "New game" notification instead.
+Whose turn it is already reaches them the same way.

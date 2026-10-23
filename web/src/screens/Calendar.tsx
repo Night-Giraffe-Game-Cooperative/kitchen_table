@@ -34,11 +34,24 @@ import {
   type DaysPreset,
   type Occurrence,
 } from '../lib/days';
-import type { CalendarEvent, CalendarLink, DayPart, Me, Person, Repeat, Task, TaskKind } from '../lib/types';
+import type { CalendarEvent, CalendarLink, DayPart, Me, Person, Repeat, Task, TaskCheck, TaskKind } from '../lib/types';
 import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Input, Notice, Segmented, Select, TextArea, Toggle } from '../components/ui';
 import { InfoTip } from '../components/tips';
 import { Icon } from '../components/icons';
-import { Stars, canChange, canSetFor, errorText, taskPeople, tint, useLive, usePersonOf, useTasks, useToday } from './tasksShared';
+import {
+  Stars,
+  ariaTick,
+  canChange,
+  canSetFor,
+  errorText,
+  tapTick,
+  taskPeople,
+  tint,
+  useLive,
+  usePersonOf,
+  useTasks,
+  useToday,
+} from './tasksShared';
 import { HomeworkView, TodayHomework, rewardText } from './Homework';
 import { RewardsView } from './Rewards';
 import { calendarOn } from '../lib/features';
@@ -275,14 +288,17 @@ function TodayView({
 
       {tasks.error && !tasks.data && <Notice tone="danger">{tasks.error}</Notice>}
 
+      <ToCheck live={tasks} day={day} />
+
       <section className="cal-section" aria-labelledby="today-tasks">
         <div className="with-info">
           <h2 className="section-label" id="today-tasks">
             Today's tasks
           </h2>
           <InfoTip about="today's tasks">
-            Tap a task to tick it off. Everyone ticks off their own, and a guardian can tick off a child's. Anyone can add tasks for themselves;
-            {me.role === 'kid' ? " the ones you set yourself don't earn rewards." : " the ones kids set themselves don't earn rewards."}
+            {me.role === 'kid'
+              ? "Tap a task to tick it off when you've done it. A grown-up checks it, and then it counts for stars and rewards. The tasks you set yourself are yours to tick off, but don't earn rewards."
+              : "Tap a task to tick it off. Everyone ticks off their own, and a guardian can tick off a child's. When a kid ticks off a task a grown-up set, it waits under To check until a grown-up says yes. Anyone can add tasks for themselves; the ones kids set themselves don't earn rewards or need checking."}
           </InfoTip>
         </div>
         {tasks.data && people.length === 0 && (
@@ -337,8 +353,11 @@ function PersonToday({ person, tasks, day, live }: { person: Person; tasks: Task
   const { me } = useStore();
   const canTick = canSetFor(me, person);
   const done = tasks.filter((t) => live.isDone(t.id, person.id, day)).length;
+  const waiting = tasks.filter((t) => live.stateOf(t.id, person.id, day) === 'waiting').length;
   const stars = (live.data?.done ?? []).filter((c) => c.user_id === person.id && c.on <= day).reduce((n, c) => n + c.stars, 0);
   const allDone = done === tasks.length;
+  const mine = person.id === me.id;
+  const count = [allDone ? 'All done!' : `${done} of ${tasks.length} done`, waiting > 0 && (mine ? `${waiting} waiting for a grown-up` : `${waiting} to check`)];
 
   return (
     <section className="jobs-card sheet" style={tint(person)} data-done={allDone || undefined} aria-label={`${person.name}'s tasks`}>
@@ -346,26 +365,33 @@ function PersonToday({ person, tasks, day, live }: { person: Person; tasks: Task
         <Avatar person={person} size="md" />
         <span className="jobs-who">
           <strong>{person.name}</strong>
-          <span className="muted">{allDone ? 'All done!' : `${done} of ${tasks.length} done`}</span>
+          <span className="muted">{count.filter(Boolean).join(' · ')}</span>
         </span>
         <Stars n={stars} />
       </header>
       <ul className="jobs-list">
         {byPart(tasks).map((t) => {
-          const isDone = live.isDone(t.id, person.id, day);
+          const state = live.stateOf(t.id, person.id, day);
+          const next = tapTick(me, t, state);
           const sticker = live.data?.done.find((c) => c.task_id === t.id && c.user_id === person.id && c.on === day)?.sticker;
           const reward = rewardText(t);
-          const about = [t.part !== 'any' && partLabels[t.part], sticker ? `Got ${sticker}` : reward].filter(Boolean).join(' · ');
+          const about =
+            state === 'waiting'
+              ? mine
+                ? `⏳ Waiting for a grown-up to check${reward ? `, then ${reward}` : ''}`
+                : `⏳ ${person.name} says it's done. Tap if it is.`
+              : [t.part !== 'any' && partLabels[t.part], sticker ? `Got ${sticker}` : reward].filter(Boolean).join(' · ');
+          const why = !canTick ? `Only ${person.name} or their guardian can tick this.` : next === null ? 'A grown-up has checked this one.' : undefined;
           return (
             <li key={t.id}>
               <button
                 type="button"
                 role="checkbox"
-                aria-checked={isDone}
+                aria-checked={ariaTick(state)}
                 className="job"
-                disabled={!canTick}
-                title={canTick ? undefined : `Only ${person.name} or their guardian can tick this.`}
-                onClick={() => live.tick(t, person.id, day, !isDone)}
+                disabled={!canTick || next === null}
+                title={why}
+                onClick={() => next !== null && live.tick(t, person.id, day, next)}
               >
                 <span className="job-emoji" aria-hidden="true">
                   {t.emoji}
@@ -375,7 +401,7 @@ function PersonToday({ person, tasks, day, live }: { person: Person; tasks: Task
                   {about && <span className="muted">{about}</span>}
                 </span>
                 <span className="job-box" aria-hidden="true">
-                  <Icon name="check" size={26} />
+                  {state === 'waiting' ? <span className="job-wait">⏳</span> : <Icon name="check" size={26} />}
                 </span>
               </button>
             </li>
@@ -387,6 +413,61 @@ function PersonToday({ person, tasks, day, live }: { person: Person; tasks: Task
           🎉 Well done, {person.name}!
         </p>
       )}
+    </section>
+  );
+}
+
+/** Kids' ticks waiting for a grown-up to say yes, it's done, or not yet. */
+function ToCheck({ live, day }: { live: ReturnType<typeof useTasks>; day: Day }) {
+  const personOf = usePersonOf();
+  const items = live.data?.to_check ?? [];
+  if (items.length === 0) return null;
+  return (
+    <section className="cal-section" aria-labelledby="to-check">
+      <div className="with-info">
+        <h2 className="section-label" id="to-check">
+          To check
+        </h2>
+        <InfoTip about="checking">
+          When a kid ticks off a task a grown-up set, or hands in homework, it waits here. Say yes and it counts, with its stars, stickers and pocket
+          money. Not yet takes the tick away, and homework goes back to done.
+        </InfoTip>
+      </div>
+      <ul className="check-list">
+        {items.map((c: TaskCheck) => {
+          const person = personOf(c.user_id);
+          if (!person) return null;
+          const homework = c.kind === 'homework';
+          const what = `${c.title}, ${person.name}`;
+          const yes = homework ? 'Yes, handed in' : 'Yes, done';
+          const when = relativeLabel(c.on, day);
+          const about = [
+            person.name,
+            `${homework ? 'handed in' : 'ticked'} ${when === 'Today' || when === 'Yesterday' ? when.toLowerCase() : `on ${when}`}`,
+            c.late ? 'late, so no reward' : rewardText(c),
+          ];
+          return (
+            <li key={`${c.task_id}:${c.user_id}:${c.on}`} className="check sheet" style={tint(person)}>
+              <Avatar person={person} size="sm" />
+              <span className="job-text">
+                <strong>
+                  <span aria-hidden="true">{c.emoji} </span>
+                  {c.title}
+                </strong>
+                <span className="muted">{about.filter(Boolean).join(' · ')}</span>
+              </span>
+              <span className="check-actions">
+                <Button size="sm" variant="primary" icon="check" aria-label={`${yes}: ${what}`} onClick={() => live.check(c, true)}>
+                  {yes}
+                </Button>
+                <Button size="sm" variant="ghost" aria-label={`Not yet: ${what}`} onClick={() => live.check(c, false)}>
+                  Not yet
+                </Button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -780,8 +861,9 @@ function WeekChart({
                       </td>
                     );
                   }
-                  const done = live.isDone(t.id, person.id, d);
-                  const sticker = done && live.data?.done.find((c) => c.task_id === t.id && c.user_id === person.id && c.on === d)?.sticker;
+                  const state = live.stateOf(t.id, person.id, d);
+                  const next = tapTick(me, t, state);
+                  const sticker = state === 'done' && live.data?.done.find((c) => c.task_id === t.id && c.user_id === person.id && c.on === d)?.sticker;
                   const future = d > now;
                   return (
                     <td key={d} data-today={d === now || undefined}>
@@ -789,12 +871,12 @@ function WeekChart({
                         type="button"
                         role="checkbox"
                         className="chart-cell"
-                        aria-checked={done}
-                        aria-label={`${t.title}, ${weekdayNames[i]}`}
-                        disabled={!canTick || (future && !done)}
-                        onClick={() => live.tick(t, person.id, d, !done)}
+                        aria-checked={ariaTick(state)}
+                        aria-label={`${t.title}, ${weekdayNames[i]}${state === 'waiting' ? ', waiting for a grown-up' : ''}`}
+                        disabled={!canTick || next === null || (future && state === 'todo')}
+                        onClick={() => next !== null && live.tick(t, person.id, d, next)}
                       >
-                        {done ? sticker || '⭐' : ''}
+                        {state === 'waiting' ? '⏳' : state === 'done' ? sticker || '⭐' : ''}
                       </button>
                     </td>
                   );

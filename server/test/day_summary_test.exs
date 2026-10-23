@@ -64,7 +64,9 @@ defmodule Family.DaySummaryTest do
              "🍂 Half term · 🎂 Gran's birthday · 🦷 Dentist 10:30 · 🏊 Swimming 16:00",
              "Remember: 🎒 PE kit (Mia, Ruby)",
              "Homework due: ✏️ Spellings (Ruby)",
-             "✅ 2 jobs to tick off"
+             "✅ 2 jobs to tick off",
+             # Mia made her bed; it waits for a grown-up to check.
+             "👀 1 tick from the kids to check"
            ]
 
     assert DaySummary.summary(admin, @day).lines == summary.lines

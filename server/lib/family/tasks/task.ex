@@ -103,12 +103,15 @@ end
 defmodule Family.Tasks.Completion do
   use Ecto.Schema
 
-  # A task ticked off (or homework handed in on time), and what it earned.
+  # A task ticked off (or homework handed in), and what it earned. A kid's
+  # tick on a task a grown-up set is waiting until a grown-up checks it, and
+  # earns nothing till then.
   schema "task_completions" do
     belongs_to :task, Family.Tasks.Task
     belongs_to :user, Family.Accounts.User
     field :on, :date
     belongs_to :done_by, Family.Accounts.User
+    field :waiting, :boolean, default: false
     field :stars, :integer, default: 1
     field :pence, :integer, default: 0
     field :sticker, :string

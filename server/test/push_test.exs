@@ -165,7 +165,10 @@ defmodule Family.PushTest do
     {:ok, game} =
       Games.create(admin, room.id, %{"type" => "chess", "mode" => "versus", "seats" => %{"w" => admin.id, "b" => lucy.id}, "state" => %{"turn" => "w"}})
 
-    assert_receive {:push, "/lucy", _, _}
+    # Lucy is asked to play; the chat itself stays quiet.
+    assert_receive {:push, "/lucy", _, body}
+    assert %{"kind" => "game", "title" => "New game", "body" => "Alex started Chess with you."} = FakePush.decrypt(body, phone)
+    refute_receive {:push, "/lucy", _, _}, 100
     {:ok, _} = Games.move(admin, game.id, %{"version" => game.version, "state" => %{"turn" => "b"}})
     assert_receive {:push, "/lucy", _, body}
     assert %{"kind" => "turn", "body" => "Alex has had a go in Chess.", "url" => url} = FakePush.decrypt(body, phone)

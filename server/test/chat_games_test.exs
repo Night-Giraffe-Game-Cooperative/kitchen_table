@@ -68,7 +68,8 @@ defmodule Family.ChatGamesTest do
     assert {:ok, game} = Games.move(grownup, game.id, %{"version" => game.version, "state" => %{"turn" => "w"}, "status" => "finished", "summary" => "Jo won"})
     assert game.status == "finished"
     assert {:error, "That game has finished."} = Games.move(kid, game.id, %{"version" => game.version, "state" => %{}})
-    assert Enum.any?(Chat.list_messages(room.id), &(&1.kind == "system" and &1.body == "Jo won"))
+    # Starting and finishing a game leave the chat itself alone.
+    assert Chat.list_messages(room.id) == []
   end
 
   test "taking a game off the list stops it for everyone, when you may", %{kid: kid, grownup: grownup, admin: admin, room: room} do
@@ -82,7 +83,7 @@ defmodule Family.ChatGamesTest do
     ids = fn user -> user |> Games.list_for() |> Enum.map(& &1.id) end
     refute game.id in ids.(grownup)
     assert game.id in ids.(kid)
-    assert Enum.any?(Chat.list_messages(room.id), &(&1.body == "Jo stopped the chess game"))
+    assert Chat.list_messages(room.id) == []
 
     # Someone not playing only takes it off their own list; a finished game just goes.
     third = person_fixture(admin, "grownup", "Kim")

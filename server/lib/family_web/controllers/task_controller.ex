@@ -9,7 +9,11 @@ defmodule FamilyWeb.TaskController do
          {:ok, to} <- Date.from_iso8601(to),
          true <- Date.diff(to, from) in 0..62 || {:error, "Ask for up to two months of days."} do
       {tasks, done} = Tasks.list(user, from, to)
-      json(conn, %{tasks: Enum.map(tasks, &Present.task/1), done: Enum.map(done, &Present.completion/1)})
+      json(conn, %{
+        tasks: Enum.map(tasks, &Present.task/1),
+        done: Enum.map(done, &Present.completion/1),
+        to_check: Enum.map(Tasks.to_check(user), &Present.to_check/1)
+      })
     else
       {:error, message} when is_binary(message) -> {:error, message}
       _ -> {:error, "Those days aren't right."}
@@ -33,6 +37,12 @@ defmodule FamilyWeb.TaskController do
 
     with {:ok, on} <- day(on, if(user.role == "kid", do: 7, else: 31)),
          :ok <- Tasks.tick(user, String.to_integer(id), person, on, params["done"] != false),
+         do: json(conn, %{ok: true})
+  end
+
+  def check(conn, %{"id" => id, "user_id" => person, "on" => on, "ok" => ok}) when is_integer(person) and is_boolean(ok) do
+    with {:ok, on} <- day(on, 31),
+         :ok <- Tasks.check(conn.assigns.current_user, String.to_integer(id), person, on, ok),
          do: json(conn, %{ok: true})
   end
 

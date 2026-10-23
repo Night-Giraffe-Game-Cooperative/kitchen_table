@@ -49,6 +49,9 @@ defmodule FamilyWeb.Router do
         delete "/people/:id", PeopleController, :delete
         patch "/bubbles/:id", PeopleController, :bubble
         get "/outbox", PeopleController, :outbox
+        get "/email", PeopleController, :email
+        put "/email", PeopleController, :setup_email
+        delete "/email", PeopleController, :clear_email
 
         get "/rooms", RoomController, :index
         post "/rooms", RoomController, :create
@@ -89,6 +92,7 @@ defmodule FamilyWeb.Router do
         patch "/tasks/:id", TaskController, :update
         delete "/tasks/:id", TaskController, :delete
         post "/tasks/:id/done", TaskController, :done
+        post "/tasks/:id/check", TaskController, :check
         post "/tasks/:id/status", TaskController, :status
 
         get "/push", PushController, :show

@@ -85,6 +85,17 @@ test('only an admin adds people, and they get a one-time password', async () => 
 
   await admin.getByRole('link', { name: 'Emails sent by the app' }).click();
   await expect(admin.getByText(kidOtp)).toBeVisible();
+
+  // Email isn't set up, so the page says how to send it from Gmail.
+  const sending = admin.locator('section', { has: admin.getByRole('heading', { name: 'Sending email' }) });
+  await expect(sending).toContainText('myaccount.google.com/apppasswords');
+  await sending.getByLabel('Gmail address').fill('us@example.org');
+  await sending.getByLabel('App password').fill('not gmail');
+  await sending.getByRole('button', { name: 'Save and send a test' }).click();
+  await expect(sending).toContainText('Put in the email server');
+  await sending.getByRole('switch', { name: 'Another email provider' }).click();
+  await expect(sending.getByLabel('Email server')).toBeVisible();
+  await shot(admin, '05a-email-setup');
 });
 
 test('a kid signs in with the one-time password and chooses their own', async ({ browser }) => {
@@ -176,6 +187,13 @@ test('Chess: the family against the computer', async () => {
   await admin.getByRole('button', { name: 'How to play' }).click();
   await expect(admin.getByRole('dialog')).toContainText('How the pieces move');
   await admin.getByRole('button', { name: 'Back to the game' }).click();
+
+  // The chat shows its games above the messages, not as messages in it.
+  await admin.getByRole('link', { name: /^Chats\b/ }).click();
+  await admin.getByRole('link', { name: /Whole family/ }).click();
+  await expect(admin.getByRole('navigation', { name: 'Games in this chat' })).toContainText('Chess');
+  await expect(admin.locator('.messages')).not.toContainText('started');
+  await shot(admin, '12a-games-above-the-chat');
 });
 
 test('Picture Puzzle and Story Chain', async () => {
@@ -530,12 +548,26 @@ test('daily tasks: a task for Mia, ticked off on her phone and seen straight awa
   const job = kid.getByRole('checkbox', { name: /Feed the cat/ });
   await expect(job).toHaveAttribute('aria-checked', 'false');
   await job.click();
-  await expect(job).toHaveAttribute('aria-checked', 'true');
+  // Her tick waits for a grown-up, and she only sees her own tasks, not Alex's.
+  await expect(job).toHaveAttribute('aria-checked', 'mixed');
+  await expect(job).toContainText('Waiting for a grown-up to check');
   await expect(kid.getByText('Well done, Mia!')).toBeVisible();
+  await expect(kid.getByRole('region', { name: "Alex's tasks" })).toHaveCount(0);
   await expect(kid.getByText('Nothing on the calendar today.')).toBeVisible();
   await shot(kid, '26-phone-tasks-today');
-  await expect(cell).toHaveAttribute('aria-checked', 'true');
+  await expect(cell).toHaveAttribute('aria-checked', 'mixed');
   await shot(admin, '27-week-chart');
+
+  // Alex says yes on Today, and it's done for real; Mia can't untick it now.
+  await admin.getByRole('radio', { name: 'Today' }).click();
+  const toCheck = admin.getByRole('region', { name: 'To check' });
+  await expect(toCheck).toContainText('Feed the cat');
+  await expect(toCheck).toContainText('Mia · ticked today');
+  await shot(admin, '27a-to-check');
+  await toCheck.getByRole('button', { name: /^Yes, done: Feed the cat, Mia/ }).click();
+  await expect(toCheck).toHaveCount(0);
+  await expect(job).toHaveAttribute('aria-checked', 'true');
+  await expect(job).toBeDisabled();
 });
 
 test('another family: the home family chooses what they can use, and they are never admins', async ({ browser }) => {
@@ -695,6 +727,11 @@ test('rewards, reminders, homework, and labels on buttons', async () => {
   const bed = kid.getByRole('checkbox', { name: /Make the bed/ });
   await expect(bed).toContainText('⭐ 2 · 50p · a sticker');
   await bed.click();
+  await expect(bed).toContainText('Waiting for a grown-up to check, then ⭐ 2 · 50p · a sticker');
+
+  // It earns once Alex checks it.
+  await admin.getByRole('radio', { name: 'Today' }).click();
+  await admin.getByRole('region', { name: 'To check' }).getByRole('button', { name: /^Yes, done: Make the bed, Mia/ }).click();
   await expect(bed).toContainText('Got ');
 
   // Alex pays Mia and sets her a goal.

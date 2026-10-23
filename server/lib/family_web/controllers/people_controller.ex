@@ -79,6 +79,20 @@ defmodule FamilyWeb.PeopleController do
     end
   end
 
+  def email(conn, _) do
+    with {:ok, status} <- Mailer.status(conn.assigns.current_user), do: json(conn, %{email: status})
+  end
+
+  def setup_email(conn, params) do
+    user = conn.assigns.current_user
+    with :ok <- Mailer.setup(user, params), {:ok, status} <- Mailer.status(user), do: json(conn, %{email: status})
+  end
+
+  def clear_email(conn, _) do
+    user = conn.assigns.current_user
+    with :ok <- Mailer.clear(user), {:ok, status} <- Mailer.status(user), do: json(conn, %{email: status})
+  end
+
   def outbox(conn, _) do
     if Permissions.can?(conn.assigns.current_user, :manage_people) do
       emails =

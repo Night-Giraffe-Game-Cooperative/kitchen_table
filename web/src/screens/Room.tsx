@@ -13,7 +13,7 @@ import { Icon } from '../components/icons';
 import { DoodleEditor, type DoodleBackground } from '../components/DoodleEditor';
 import { confirmFirst } from '../components/confirm';
 import { NewGameDialog } from './Games';
-import { gameDef, gameStatusLine } from '../games/registry';
+import { gameDef, gameStatusLine, isMyTurn } from '../games/registry';
 
 const PAGE = 60;
 
@@ -154,6 +154,8 @@ export function RoomView({ room }: { room: Room }) {
   const canEdit = !reading && room.kind === 'group' && (room.created_by_id === me.id || me.role === 'admin');
 
   const gamesById = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
+  // Games sit above the chat rather than in it, so starting one doesn't fill it up.
+  const going = games.filter((g) => g.room_id === room.id && g.status === 'active');
 
   async function toggleMuted() {
     const muted = !room.muted;
@@ -218,6 +220,27 @@ export function RoomView({ room }: { room: Room }) {
         )}
         {canEdit && <IconButton icon="pen" label="Change group" onClick={() => setEditing(true)} />}
       </header>
+
+      {!reading && going.length > 0 && (
+        <nav className="room-games" aria-label="Games in this chat">
+          {going.slice(0, 3).map((g) => {
+            const def = gameDef(g.type);
+            return (
+              <a key={g.id} className="room-game" href={`#/games/${g.id}`} data-turn={isMyTurn(g, me.id) || undefined}>
+                <span aria-hidden="true">{def?.emoji ?? '🎲'}</span>
+                <span className="room-game-text">
+                  <strong>{def?.name ?? 'A game'}</strong> · {gameStatusLine(g, me.id, people)}
+                </span>
+              </a>
+            );
+          })}
+          {going.length > 3 && (
+            <a className="room-game" href="#/games">
+              {going.length - 3} more
+            </a>
+          )}
+        </nav>
+      )}
 
       <div className="messages" ref={list} onScroll={onScroll} onClick={(e) => e.target === e.currentTarget && setSelected(null)}>
         {error && <Notice tone="danger">{error}</Notice>}

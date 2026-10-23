@@ -116,7 +116,26 @@ defmodule FamilyWeb.Present do
   end
 
   def completion(%Family.Tasks.Completion{} = c),
-    do: %{task_id: c.task_id, user_id: c.user_id, on: c.on, done_by_id: c.done_by_id, stars: c.stars, pence: c.pence, sticker: c.sticker}
+    do: %{task_id: c.task_id, user_id: c.user_id, on: c.on, done_by_id: c.done_by_id, waiting: c.waiting, stars: c.stars, pence: c.pence, sticker: c.sticker}
+
+  # A kid's tick waiting for a grown-up, with what it is and what it will earn.
+  def to_check(%Family.Tasks.Completion{task: t} = c) do
+    late = Family.Tasks.late?(c, t)
+
+    %{
+      task_id: c.task_id,
+      user_id: c.user_id,
+      on: c.on,
+      kind: t.kind,
+      emoji: t.emoji,
+      title: t.title,
+      due_on: t.due_on,
+      late: late,
+      stars: if(late, do: 0, else: t.stars),
+      pence: if(late, do: 0, else: t.pence),
+      sticker: not late and t.sticker
+    }
+  end
 
   def rewards(r) do
     %{

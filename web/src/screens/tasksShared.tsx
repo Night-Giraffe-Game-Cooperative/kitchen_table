@@ -3,13 +3,39 @@ import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import { join } from '../lib/socket';
 import { today, type Day } from '../lib/days';
-import type { Me, Person, Task, TaskDone } from '../lib/types';
+import type { Me, Person, Task, TaskCheck, TaskDone } from '../lib/types';
 
 // What the Tasks section's views share: who may do what, live data and the stars.
 
 export interface TaskData {
   tasks: Task[];
   done: TaskDone[];
+  /** Kids' ticks waiting for this grown-up to check. */
+  to_check?: TaskCheck[];
+}
+
+/** Where a task stands for someone on a day: not done, ticked by a kid and waiting for a grown-up, or done for real. */
+export type TickState = 'todo' | 'waiting' | 'done';
+
+/** Whether my tick on a task waits for a grown-up: a kid's, on a task a grown-up set. */
+export function needsCheck(me: Me, task: Pick<Task, 'created_by_id'>): boolean {
+  return me.role === 'kid' && task.created_by_id !== me.id;
+}
+
+/**
+ * What tapping a task does now: true ticks it (or, for a grown-up, agrees a
+ * kid's waiting tick), false unticks it, and null means it can't change,
+ * as a kid can't untick what a grown-up has checked.
+ */
+export function tapTick(me: Me, task: Task, state: TickState): boolean | null {
+  if (state === 'todo') return true;
+  if (state === 'waiting') return me.role !== 'kid';
+  return needsCheck(me, task) ? null : false;
+}
+
+/** The checkbox state for a tick: a waiting tick is half-way. */
+export function ariaTick(state: TickState): boolean | 'mixed' {
+  return state === 'waiting' ? 'mixed' : state === 'done';
 }
 
 export function errorText(e: unknown): string {
@@ -97,10 +123,26 @@ export function useTasks(from: Day, to: Day) {
 
   const tick = useCallback(
     async (task: Task, personId: number, day: Day, done: boolean) => {
-      const same = (c: TaskDone) => c.task_id === task.id && c.user_id === personId && c.on === day;
-      setData((d) =>
-        d && { ...d, done: done ? [...d.done.filter((c) => !same(c)), { task_id: task.id, user_id: personId, on: day, done_by_id: me.id, stars: task.stars, pence: task.pence, sticker: null }] : d.done.filter((c) => !same(c)) },
-      );
+      const same = (c: Pick<TaskDone, 'task_id' | 'user_id' | 'on'>) => c.task_id === task.id && c.user_id === personId && c.on === day;
+      const waits = needsCheck(me, task);
+      setData((d) => {
+        if (!d) return d;
+        const rest = d.done.filter((c) => !same(c));
+        const was = d.done.find(same);
+        const to_check = d.to_check?.filter((c) => !same(c));
+        if (!done) return { ...d, done: rest, to_check };
+        const tick: TaskDone = {
+          task_id: task.id,
+          user_id: personId,
+          on: day,
+          done_by_id: was?.done_by_id ?? me.id,
+          waiting: waits,
+          stars: waits ? 0 : task.stars,
+          pence: waits ? 0 : task.pence,
+          sticker: was?.sticker ?? null,
+        };
+        return { ...d, done: [...rest, tick], to_check };
+      });
       try {
         await api.post(`/api/tasks/${task.id}/done`, { user_id: personId, on: day, done });
       } catch (e) {
@@ -108,15 +150,44 @@ export function useTasks(from: Day, to: Day) {
         reload();
       }
     },
-    [me.id, setData, reload, toast],
+    [me, setData, reload, toast],
   );
 
-  const isDone = useCallback(
-    (taskId: number, personId: number, day: Day) => !!live.data?.done.some((c) => c.task_id === taskId && c.user_id === personId && c.on === day),
+  /** A grown-up says a kid's waiting tick is done for real, or not yet. */
+  const check = useCallback(
+    async (item: TaskCheck, ok: boolean) => {
+      const same = (c: Pick<TaskDone, 'task_id' | 'user_id' | 'on'>) => c.task_id === item.task_id && c.user_id === item.user_id && c.on === item.on;
+      setData(
+        (d) =>
+          d && {
+            ...d,
+            to_check: d.to_check?.filter((c) => !same(c)),
+            done: ok ? d.done.map((c) => (same(c) ? { ...c, waiting: false, stars: item.stars, pence: item.pence } : c)) : d.done.filter((c) => !same(c)),
+            tasks: ok || item.kind !== 'homework' ? d.tasks : d.tasks.map((t) => (t.id === item.task_id ? { ...t, status: 'done' } : t)),
+          },
+      );
+      try {
+        await api.post(`/api/tasks/${item.task_id}/check`, { user_id: item.user_id, on: item.on, ok });
+      } catch (e) {
+        toast(errorText(e), 'danger');
+      }
+      reload();
+    },
+    [setData, reload, toast],
+  );
+
+  const stateOf = useCallback(
+    (taskId: number, personId: number, day: Day): TickState => {
+      const c = live.data?.done.find((c) => c.task_id === taskId && c.user_id === personId && c.on === day);
+      return !c ? 'todo' : c.waiting ? 'waiting' : 'done';
+    },
     [live.data],
   );
 
-  return { ...live, tick, isDone };
+  /** Done, or ticked and waiting for a grown-up: either way it's off the list of things to do. */
+  const isDone = useCallback((taskId: number, personId: number, day: Day) => stateOf(taskId, personId, day) !== 'todo', [stateOf]);
+
+  return { ...live, tick, check, stateOf, isDone };
 }
 
 /** The people who have tasks, you first, then by name. */

@@ -99,8 +99,10 @@ defmodule Family.Games do
           last_move_by_id: user.id
         })
 
-      {:ok, _} = Chat.post_system(room_id, %{kind: "game", user_id: user.id, game_id: game.id})
+      # Games keep out of the chat itself: it shows the games going on in it
+      # above the messages, and the people asked to play hear about it.
       announce(game)
+      Family.Push.game_started(game)
       {:ok, game}
     end
   end
@@ -160,7 +162,6 @@ defmodule Family.Games do
           |> Repo.update!()
 
         announce(game)
-        if finished, do: Chat.post_system(game.room_id, %{kind: "system", body: game.summary, game_id: game.id})
         {:ok, game}
       end
     end)
@@ -189,7 +190,6 @@ defmodule Family.Games do
             |> Repo.update!()
 
           announce(game)
-          Chat.post_system(game.room_id, %{kind: "system", body: game.summary, game_id: game.id})
         end
 
         now = DateTime.utc_now(:second)

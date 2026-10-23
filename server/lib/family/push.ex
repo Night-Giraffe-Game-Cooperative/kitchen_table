@@ -232,6 +232,26 @@ defmodule Family.Push do
     end)
   end
 
+  @doc """
+  A new game: the people given a seat in it hear who asked them to play,
+  except the starter, and whoever's turn it is, who hears that instead.
+  """
+  def game_started(game) do
+    turn = Map.get(game.seats, Map.get(game.state, "turn", "anyone"))
+    ids = for {_, id} <- game.seats, is_integer(id), id != game.created_by_id, id != turn, uniq: true, do: id
+
+    if ids != [] do
+      later(fn ->
+        who = Repo.get(User, game.created_by_id)
+        name = Map.get(@games, game.type, "a game")
+        body = "#{who.name} started #{name} with you."
+        notify(able(ids, :play_games), %{kind: "game", title: "New game", body: body, tag: "game-#{game.id}", url: "/#/games/#{game.id}"}, topic: "game-#{game.id}")
+      end)
+    end
+
+    :ok
+  end
+
   @doc "A morning or evening summary (Family.DaySummary), on all of someone's devices. Its own timing already took quiet hours into account."
   def day_summary(%User{} = user, kind, %{title: title, body: body}) when kind in [:morning, :evening] do
     payload = %{kind: to_string(kind), title: title, body: body, tag: to_string(kind), url: "/#/calendar", at: System.system_time(:millisecond)}

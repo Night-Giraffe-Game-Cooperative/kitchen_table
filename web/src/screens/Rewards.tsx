@@ -43,8 +43,8 @@ export function RewardsView() {
           How rewards work
           <InfoTip about="how rewards work">
             {me.role === 'kid'
-              ? "Stars, stickers and pocket money come from the tasks and homework your guardians set, each time you tick one off or hand homework in on time. Tasks you set yourself are just for you, so they don't earn any."
-              : "Stars, stickers and pocket money come from the tasks and homework guardians set: each time a task is ticked off, or homework is handed in on time. Pocket money adds up until you mark it paid. The tasks kids set themselves don't earn rewards."}
+              ? "Stars, stickers and pocket money come from the tasks and homework your guardians set, each time you tick one off or hand homework in on time, once a grown-up has checked it. Tasks you set yourself are just for you, so they don't earn any."
+              : "Stars, stickers and pocket money come from the tasks and homework guardians set: each time a task is ticked off, or homework is handed in on time. A kid's tick counts once a grown-up checks it under To check on Today. Pocket money adds up until you mark it paid. The tasks kids set themselves don't earn rewards."}
           </InfoTip>
         </p>
       )}

@@ -3784,3 +3784,39 @@ circle.bg-checker {
 .bg-last {
   font-size: var(--text-sm);
 }
+
+/* ---------- Games going on in a chat, above its messages ---------- */
+
+.room-games {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--divider);
+}
+
+.room-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+  max-width: 18rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  color: inherit;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.room-game[data-turn] {
+  border-color: var(--sunflower);
+  background: var(--sunflower-tint);
+}
+
+.room-game-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

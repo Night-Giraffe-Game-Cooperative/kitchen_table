@@ -4,7 +4,7 @@ import { go } from '../lib/router';
 import { addDays, dueLabel, money, shortLabel, today, type Day } from '../lib/days';
 import type { HomeworkStatus, Person, Task } from '../lib/types';
 import { Avatar, Button, EmptyState, IconButton, Notice } from '../components/ui';
-import { canChange, canSetFor, errorText, tint, usePersonOf, useTasks, useToday } from './tasksShared';
+import { canChange, canSetFor, errorText, needsCheck, tint, usePersonOf, useTasks, useToday } from './tasksShared';
 
 export const statusLabels: Record<HomeworkStatus, string> = {
   todo: 'To do',
@@ -136,7 +136,12 @@ export function HomeworkRow({
 }) {
   const { me, toast } = useStore();
   const personOf = usePersonOf();
-  const canMove = canSetFor(me, person);
+  const handIn = live.data?.done.find((c) => c.task_id === t.id);
+  // A kid's hand-in waits for a grown-up; once checked, only a grown-up moves it.
+  const waiting = t.status === 'handed_in' && !!handIn?.waiting;
+  const checked = needsCheck(me, t) && !!handIn && !handIn.waiting;
+  const toCheck = live.data?.to_check?.find((c) => c.task_id === t.id);
+  const canMove = canSetFor(me, person) && !checked;
   const changeable = !!onEdit && canChange(me, t, personOf);
   const status = t.status ?? 'todo';
   const late = status !== 'handed_in' && !!t.due_on && t.due_on < now;
@@ -145,20 +150,48 @@ export function HomeworkRow({
 
   async function move(next: HomeworkStatus) {
     if (next === status) return;
-    live.setData((d) => d && { ...d, tasks: d.tasks.map((x) => (x.id === t.id ? { ...x, status: next } : x)) });
+    const on = today();
+    const waits = next === 'handed_in' && needsCheck(me, t);
+    const onTime = !!t.due_on && on <= t.due_on;
+    live.setData(
+      (d) =>
+        d && {
+          ...d,
+          tasks: d.tasks.map((x) => (x.id === t.id ? { ...x, status: next } : x)),
+          done: [
+            ...d.done.filter((c) => c.task_id !== t.id),
+            ...(waits ? [{ task_id: t.id, user_id: person.id, on, done_by_id: me.id, waiting: true, stars: 0, pence: 0, sticker: null }] : []),
+          ],
+        },
+    );
     try {
-      const on = today();
       await api.post(`/api/tasks/${t.id}/status`, { status: next, on });
-      const onTime = !!t.due_on && on <= t.due_on;
-      if (next === 'handed_in') toast(onTime ? (reward ? `Handed in on time. That earns ${reward}!` : 'Handed in on time. Well done!') : 'Handed in.', 'success');
+      if (next === 'handed_in')
+        toast(
+          waits
+            ? `Handed in. A grown-up will check it${onTime && reward ? `, then it earns ${reward}` : ''}.`
+            : onTime
+              ? reward
+                ? `Handed in on time. That earns ${reward}!`
+                : 'Handed in on time. Well done!'
+              : 'Handed in.',
+          'success',
+        );
     } catch (e) {
       toast(errorText(e), 'danger');
       live.reload();
     }
   }
 
-  const when =
-    status === 'handed_in' ? `Was due ${shortLabel(t.due_on!)}` : t.due_on ? dueLabel(t.due_on, now) : '';
+  const when = waiting
+    ? person.id === me.id
+      ? '⏳ Waiting for a grown-up to check'
+      : `⏳ ${person.name} says it's handed in`
+    : status === 'handed_in'
+      ? `Was due ${shortLabel(t.due_on!)}`
+      : t.due_on
+        ? dueLabel(t.due_on, now)
+        : '';
 
   return (
     <li className="hw" data-late={late || undefined} data-soon={soon || undefined} data-status={status}>
@@ -194,6 +227,16 @@ export function HomeworkRow({
           </button>
         ))}
       </div>
+      {toCheck && (
+        <div className="check-actions">
+          <Button size="sm" variant="primary" icon="check" aria-label={`Yes, handed in: ${t.title}, ${person.name}`} onClick={() => live.check(toCheck, true)}>
+            Yes, handed in
+          </Button>
+          <Button size="sm" variant="ghost" aria-label={`Not yet: ${t.title}, ${person.name}`} onClick={() => live.check(toCheck, false)}>
+            Not yet
+          </Button>
+        </div>
+      )}
     </li>
   );
 }

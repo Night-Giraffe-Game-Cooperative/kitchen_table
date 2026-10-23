@@ -266,9 +266,27 @@ export interface TaskDone {
   user_id: number;
   on: string;
   done_by_id: number | null;
+  /** A kid's tick on a task a grown-up set, waiting for a grown-up to check it. It earns nothing till then. */
+  waiting: boolean;
   stars: number;
   pence: number;
   sticker: string | null;
+}
+
+/** A kid's tick waiting for this grown-up to check, with what it is and what it will earn. */
+export interface TaskCheck {
+  task_id: number;
+  user_id: number;
+  on: string;
+  kind: TaskKind;
+  emoji: string;
+  title: string;
+  due_on: string | null;
+  /** Homework handed in after it was due earns nothing. */
+  late: boolean;
+  stars: number;
+  pence: number;
+  sticker: boolean;
 }
 
 export interface Goal {

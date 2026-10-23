@@ -115,18 +115,19 @@ defmodule Family.TasksTest do
   test "rewards: stars, pocket money and stickers, and paying out", %{admin: admin, mia: mia, ruby: ruby, jo: jo, sam: sam} do
     {:ok, bed} = Tasks.create(jo, teeth([mia.id], %{"title" => "Make the bed", "stars" => 2, "pence" => 50, "sticker" => true}))
     assert :ok = Tasks.tick(mia, bed.id, mia.id, ~D[2026-10-19], true)
+    assert :ok = Tasks.check(jo, bed.id, mia.id, ~D[2026-10-19], true)
     assert :ok = Tasks.tick(jo, bed.id, mia.id, ~D[2026-10-20], true)
 
     # Changing the task later doesn't change what was already earned.
     {:ok, _} = Tasks.update(jo, bed.id, %{"pence" => 100})
 
-    # Kids don't see what their brothers and sisters are paid.
+    # Kids only see their own, so nobody sees what a brother or sister is paid.
     {:ok, rubys} = Tasks.create(jo, teeth([ruby.id], %{"title" => "Feed the cat", "pence" => 30}))
     :ok = Tasks.tick(jo, rubys.id, ruby.id, ~D[2026-10-20], true)
     {tasks, done} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
-    assert %{pence: 0} = Enum.find(tasks, &(&1.id == rubys.id))
+    refute Enum.any?(tasks, &(&1.id == rubys.id))
     assert %{pence: 100} = Enum.find(tasks, &(&1.id == bed.id))
-    assert Enum.all?(done, &(&1.pence == 0 or &1.user_id == mia.id))
+    assert Enum.all?(done, &(&1.user_id == mia.id))
     assert %{pence: 30} = jo |> Tasks.list(~D[2026-10-20], ~D[2026-10-20]) |> elem(0) |> Enum.find(&(&1.id == rubys.id))
     mine = fn who -> Enum.find(Tasks.rewards(who), &(&1.user_id == mia.id)) end
     assert %{stars: 4, earned_pence: 100, paid_pence: 0, stickers: [%{sticker: a}, %{sticker: b}]} = mine.(jo)
@@ -168,6 +169,8 @@ defmodule Family.TasksTest do
     {:ok, goal} = Tasks.create_goal(jo, %{"user_id" => mia.id, "title" => "Trip to the park", "emoji" => "🛝", "stars" => 3})
     {:ok, read} = Tasks.create(jo, teeth([mia.id], %{"title" => "Read", "stars" => 2}))
     assert :ok = Tasks.tick(mia, read.id, mia.id, ~D[2026-10-19], true)
+    [{^goal, 0}] = Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id)).goals
+    assert :ok = Tasks.check(jo, read.id, mia.id, ~D[2026-10-19], true)
 
     [{^goal, 2}] = Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id)).goals
     assert {:ok, %{given_at: %DateTime{}}} = Tasks.update_goal(jo, goal.id, %{"given" => true})
@@ -220,12 +223,79 @@ defmodule Family.TasksTest do
     assert {:error, :forbidden} = Tasks.set_status(sam, hw.id, "started", ~D[2026-10-19])
     assert {:ok, %{status: "started"}} = Tasks.set_status(mia, hw.id, "started", ~D[2026-10-19])
     assert {:ok, %{status: "handed_in"}} = Tasks.set_status(mia, hw.id, "handed_in", ~D[2026-10-21])
-    assert %{stars: 1, stickers: [_]} = Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id))
+    rewards = fn -> Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id)) end
+
+    # Mia says it's handed in; it counts once a grown-up checks.
+    assert %{stars: 0, stickers: []} = rewards.()
+    assert [%{task_id: id, late: false}] = jo |> Tasks.to_check() |> Enum.map(&FamilyWeb.Present.to_check/1)
+    assert id == hw.id
+    assert :ok = Tasks.check(jo, hw.id, mia.id, ~D[2026-10-21], true)
+    assert %{stars: 1, stickers: [_]} = rewards.()
+    assert {:error, "A grown-up has checked this one, so only they can change it."} = Tasks.set_status(mia, hw.id, "done", ~D[2026-10-21])
 
     # Moved back, the reward goes; handed in late, it doesn't come back.
     assert {:ok, _} = Tasks.set_status(jo, hw.id, "done", ~D[2026-10-21])
     assert {:ok, _} = Tasks.set_status(mia, hw.id, "handed_in", ~D[2026-10-22])
-    assert %{stars: 0, stickers: []} = Enum.find(Tasks.rewards(jo), &(&1.user_id == mia.id))
+    assert [%{late: true, stars: 0}] = jo |> Tasks.to_check() |> Enum.map(&FamilyWeb.Present.to_check/1)
+    assert :ok = Tasks.check(jo, hw.id, mia.id, ~D[2026-10-22], true)
+    assert %{stars: 0, stickers: []} = rewards.()
+
+    # Not handed in after all: it goes back to done.
+    assert {:ok, _} = Tasks.set_status(jo, hw.id, "done", ~D[2026-10-22])
+    assert {:ok, _} = Tasks.set_status(mia, hw.id, "handed_in", ~D[2026-10-22])
+    assert :ok = Tasks.check(jo, hw.id, mia.id, ~D[2026-10-22], false)
+    assert %{status: "done"} = Repo.get!(Tasks.Task, hw.id)
+    assert Tasks.to_check(jo) == []
+  end
+
+  test "kids see only their own tasks, and their ticks wait for a grown-up", %{admin: admin, mia: mia, ruby: ruby, jo: jo, sam: sam} do
+    {:ok, cat} = Tasks.create(jo, teeth([mia.id, ruby.id], %{"title" => "Feed the cat", "stars" => 2}))
+    {:ok, rubys} = Tasks.create(jo, teeth([ruby.id], %{"title" => "Tidy up"}))
+    {:ok, own} = Tasks.create(mia, teeth([mia.id], %{"title" => "Read"}))
+    :ok = Tasks.tick(ruby, cat.id, ruby.id, ~D[2026-10-20], true)
+
+    {tasks, done} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
+    assert Enum.map(tasks, &{&1.title, &1.user_ids}) == [{"Feed the cat", [mia.id]}, {"Read", [mia.id]}]
+    refute Enum.any?(tasks, &(&1.id == rubys.id))
+    assert done == []
+    assert jo |> Tasks.list(~D[2026-10-20], ~D[2026-10-20]) |> elem(0) |> Enum.find(&(&1.id == cat.id)) |> Map.get(:user_ids) == [mia.id, ruby.id]
+
+    # Mia's tick waits, earning nothing; she can take it back while it does.
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], true)
+    assert {_, [%{waiting: true, stars: 0}]} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], false)
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], true)
+
+    # Her own task is hers to tick off for real.
+    assert :ok = Tasks.tick(mia, own.id, mia.id, ~D[2026-10-20], true)
+    assert {_, ticks} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
+    assert %{waiting: false} = Enum.find(ticks, &(&1.task_id == own.id))
+
+    # The grown-ups who look after her check it; not her, not another family.
+    checks = fn who -> who |> Tasks.to_check() |> Enum.map(&{&1.task_id, &1.user_id}) end
+    assert checks.(jo) == [{cat.id, ruby.id}, {cat.id, mia.id}]
+    assert checks.(admin) == checks.(jo)
+    assert checks.(sam) == [] and checks.(mia) == []
+    assert {:error, :forbidden} = Tasks.check(mia, cat.id, mia.id, ~D[2026-10-20], true)
+    assert {:error, :forbidden} = Tasks.check(sam, cat.id, mia.id, ~D[2026-10-20], true)
+
+    assert :ok = Tasks.check(jo, cat.id, mia.id, ~D[2026-10-20], true)
+    assert {:error, "That's been checked already."} = Tasks.check(jo, cat.id, mia.id, ~D[2026-10-20], true)
+    assert %{stars: 2} = Enum.find(Tasks.rewards(mia), &(&1.user_id == mia.id))
+    assert {:error, "A grown-up has checked this one, so only they can untick it."} = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], false)
+
+    # Ticking a waiting tick checks it too; "not yet" takes it away.
+    assert :ok = Tasks.tick(jo, cat.id, ruby.id, ~D[2026-10-20], true)
+    assert %{stars: 2} = Enum.find(Tasks.rewards(jo), &(&1.user_id == ruby.id))
+    :ok = Tasks.tick(ruby, cat.id, ruby.id, ~D[2026-10-21], true)
+    assert :ok = Tasks.check(jo, cat.id, ruby.id, ~D[2026-10-21], false)
+    assert {_, []} = Tasks.list(ruby, ~D[2026-10-21], ~D[2026-10-21])
+    assert checks.(jo) == []
+
+    # Grown-ups' own ticks never wait.
+    {:ok, jos} = Tasks.create(jo, teeth([jo.id], %{"title" => "Bins"}))
+    assert :ok = Tasks.tick(jo, jos.id, jo.id, ~D[2026-10-20], true)
+    assert checks.(admin) == []
   end
 
   test "rewards and homework over the API", %{conn: conn, mia: mia} do
@@ -235,6 +305,13 @@ defmodule Family.TasksTest do
 
     kid = sign_in(build_conn() |> put_req_header("x-family", "1"), "mia@example.com", "Mia password")
     kid |> post("/api/tasks/#{id}/done", %{"user_id" => mia.id, "on" => "#{Tasks.today()}"}) |> json_response(200)
+
+    # Jo sees Mia's tick waiting, and says it's done.
+    day = "#{Tasks.today()}"
+    assert %{"to_check" => [], "done" => [%{"waiting" => true}]} = kid |> get("/api/tasks?from=#{day}&to=#{day}") |> json_response(200)
+    assert %{"to_check" => [%{"task_id" => ^id, "title" => "Brush teeth", "pence" => 25, "late" => false}]} = jo |> get("/api/tasks?from=#{day}&to=#{day}") |> json_response(200)
+    assert kid |> post("/api/tasks/#{id}/check", %{"user_id" => mia.id, "on" => day, "ok" => true}) |> json_response(403)
+    assert %{"ok" => true} = jo |> post("/api/tasks/#{id}/check", %{"user_id" => mia.id, "on" => day, "ok" => true}) |> json_response(200)
 
     assert %{"rewards" => rewards, "stickers" => [_ | _]} = jo |> get("/api/rewards") |> json_response(200)
     assert %{"earned_pence" => 25, "stars" => 1} = Enum.find(rewards, &(&1["user_id"] == mia.id))

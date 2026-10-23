@@ -126,7 +126,9 @@ people.
 
 **Games.** Started from any chat, played at everyone's own pace. A game waits
 for its next move as long as it needs to, and the app says when it's your
-turn. Most start as the family playing together, and most can also be played
+turn. Games keep out of the chat's messages: the games going on in a chat
+show as a slim strip at its top, and the people asked to play get a "New
+game" notification. Most start as the family playing together, and most can also be played
 against each other. Every game has a How to play page (the book button), and
 the games explain themselves as you play: picking up a piece says
 how it moves, special rules are explained when they come up, and a chess hint
@@ -179,7 +181,11 @@ bed, feed the cat, read for ten minutes) that come round on chosen days, or
 once, in the morning, afternoon, evening or any time. Today shows each
 person's tasks as big rows to tick, and the week chart gives a star for every
 one done. Anyone sets tasks for themselves, guardians for their kids, admins
-for anyone, and a tick shows on every screen at once.
+for anyone, and a tick shows on every screen at once. Kids see only their own
+tasks. When a kid ticks off a task a grown-up set, or hands in homework, it
+waits under "To check" on a grown-up's Today until they say "Yes, done" (or
+"Not yet", which takes the tick away); only then does it count and earn its
+reward. The tasks kids set themselves are theirs to tick.
 
 **Rewards.** A task can earn stars (none to three), pocket money and a
 surprise sticker for the sticker book. Each tick keeps what it earned, so
@@ -224,10 +230,10 @@ what it does with linked calendars. Anyone can read it without signing in,
 and Google needs it before Kitchen Table can be published there.
 
 **Notifications.** Each phone, tablet or computer can switch them on from
-Me. A new message, a call ringing (then "Missed call" if nobody answered) and
-your turn in a game pop up while the app is closed. Nothing pops up on any of
-your devices while you're using the app on one of them, so the phone stays
-quiet while the tablet's in your hands. Messages in one chat join up into one
+Me. A new message, a call ringing (then "Missed call" if nobody answered), a
+game you're asked to play and your turn in it pop up while the app is
+closed. Nothing pops up on any of your devices while you're using the app on
+one of them, so the phone stays quiet while the tablet's in your hands. Messages in one chat join up into one
 notification. Quiet hours keep a kid's devices quiet, the bell at the top of a
 chat mutes just that chat, and signing out of a device stops its
 notifications. Each morning, grown-ups get a summary of the day (what's on,
@@ -268,7 +274,7 @@ in `/etc/kitchen-table.env` on the server).
 | `HTTPS_PORT` | The secure port for devices on the home network, `4443` unless set. `off` turns it off. |
 | `FAMILY_DATA_DIR` | Where everything is kept. `server/data` unless set. |
 | `FAMILY_TIME_ZONE` | The family's time zone, like `Europe/London` (the default) or `America/New_York`. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | Send invitations by email rather than keeping them in the app's outbox. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | Send invitations by email rather than keeping them in the app's outbox. An admin can instead put in a mailbox in the app (Family, Emails sent by the app, Sending email); these win if both are set. |
 | `TURN_URL`, `TURN_USERNAME`, `TURN_PASSWORD` | A relay for video calls between different networks (the server setup makes one). |
 | `PUSH_CONTACT` | A `mailto:` or `https:` address for push services to reach whoever runs the server. |
 | `CALENDAR_PRIVATE_HOSTS=1` | Allow linking calendars on the home network. |

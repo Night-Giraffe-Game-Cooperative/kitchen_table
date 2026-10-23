@@ -89,7 +89,7 @@ choose what they are:
 | --- | --- |
 | **Admin** | Everything: add people, change anyone's settings, read every chat. Admins only come from the home family. |
 | **Grown-up** | Everything except adding people. Guardian to the kids in their own family. |
-| **Kid** | Chat, share, doodle, play and tick off tasks. Their guardians decide what else. |
+| **Kid** | Chat, share, doodle, play and tick off their own tasks, which a grown-up then checks. Their guardians decide what else. |
 
 Each new person gets a **one-time password**: three words and a number, like
 `cabin-clover-berry-42`. It's shown on screen (and emailed, once email is set
@@ -198,9 +198,23 @@ Without email, invitations and new one-time passwords wait in the app's
 outbox (admins find it at the bottom of the Family page, as "Emails sent by
 the app"), and the admin sees each one-time password on screen anyway.
 
-To send real email, set these before starting. Most email providers give
-SMTP details in their help pages; many need an app password rather than your
-normal one.
+To send real email, the simplest way is in the app. An admin goes to
+**Family**, then **Emails sent by the app** at the bottom, and fills in
+**Sending email**:
+
+- **Gmail.** Switch on 2-Step Verification for the Google account, then make
+  an app password at <https://myaccount.google.com/apppasswords> (call it
+  Kitchen Table). Put in the Gmail address and the 16 letters, and press
+  **Save and send a test**. A test email goes to you, and the settings are
+  kept only if it arrives at Gmail's end.
+- **Another provider.** Tick **Another email provider** and add the email
+  server and port from its help pages. Many need an app password rather than
+  your normal one.
+
+The password is kept sealed, like a linked calendar's, and nobody can read it
+back. **Stop sending** puts email back in the outbox.
+
+Or set these before starting, which wins over anything put in the app:
 
 | Setting | Example |
 | --- | --- |
@@ -372,7 +386,7 @@ and restart.
 | Port 4000 or 4443 is already in use | Set `PORT` (and `HTTPS_PORT`) to free ones before starting. `HTTPS_PORT=off` turns the secure address off. |
 | Tablets can't open the address | The firewall: see [part 4](#4-open-it-on-tablets-and-phones). Check the tablet is on the same Wi-Fi, not a guest network. |
 | The camera doesn't start in a call | Use the `https://` address, not `http://`, and allow the camera when asked. |
-| Nobody gets invitations | Without email they're in the outbox at the bottom of the Family page. With email, check the `SMTP_` settings. |
+| Nobody gets invitations | Without email they're in the outbox at the bottom of the Family page. With email, Sending email there says which mailbox is in use; press Change and Save and send a test to check it. |
 | A kid can't message someone | It's the rule in [Who kids can chat with](#who-kids-can-chat-with): make the grown-up family to them, or ask for a yes from each family. The chat's notice says which. |
 | A linked calendar won't connect | For iCloud, use an app-specific password. For a server at home, set `CALENDAR_PRIVATE_HOSTS=1`. |
 | Notifications never arrive | They need the online version, switched on from Me on each device, and on iPhone the app on the Home Screen. |
