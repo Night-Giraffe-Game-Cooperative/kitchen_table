@@ -135,6 +135,8 @@ function Board({ game, play, me, people }: GameProps<State>) {
   const [thinking, setThinking] = useState(false);
 
   useEffect(() => {
+    // Someone else in the family finished this turn first, so the checkers moved here go back.
+    if (coop && !done && work?.moves.length && game.last_move_by_id !== me.id) toast("Someone else played the family's turn first, so have another look.", 'info');
     setWork(s.roll && myTurn ? { pos: s.pos, dice: s.dice, moves: [] } : null);
     setFrom(null);
   }, [game.version]);
@@ -433,7 +435,8 @@ function Board({ game, play, me, people }: GameProps<State>) {
           )}
         </div>
       )}
-      {!done && (myTurn || mySeat) && (
+      {/* The server takes a move only from whoever's turn it is; the bin above the board removes a game at any time. */}
+      {!done && myTurn && (
         <div className="row row-end">
           <Button
             size="sm"

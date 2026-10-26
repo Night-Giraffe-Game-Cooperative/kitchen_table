@@ -1,0 +1,428 @@
+/*
+ * Sushi Train: a wooden counter with the customers along it, a belt that
+ * keeps moving underneath, and each person's own station below: a chopping
+ * board, their plate, and big ingredient buttons. What to tap next glows.
+ */
+
+.sushi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+/* ---------- The counter and the customers ---------- */
+
+.sushi-bar.sheet {
+  position: relative;
+  padding: 0.6rem 0.5rem 0;
+  overflow: hidden;
+  background: linear-gradient(#fbf3e4, #f3e2c4);
+}
+
+.sushi-welcome {
+  position: absolute;
+  inset: 0.4rem 0 auto;
+  z-index: 2;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: #a8355a;
+  animation: sushi-welcome 2.4s ease both;
+}
+
+.sushi-welcome span {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: #6b5a48;
+}
+
+@keyframes sushi-welcome {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.sushi-diners {
+  display: grid;
+  grid-template-columns: repeat(var(--seats, 3), minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sushi-diner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 0.25rem 0.15rem 0.35rem;
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: #3b2a1c;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sushi-diner[aria-pressed='true'] {
+  border-color: #c0503a;
+  background: rgb(255 255 255 / 0.55);
+}
+
+.sushi-diner:disabled {
+  cursor: default;
+}
+
+.sushi-bubble {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.1rem;
+  min-height: 3rem;
+  min-width: 3.4rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(60 40 20 / 0.18);
+  position: relative;
+}
+
+.sushi-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -0.35rem;
+  left: 50%;
+  margin-left: -0.35rem;
+  border: 0.35rem solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+}
+
+.sushi-bubble .sushi-dish {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+@media (min-width: 48rem) {
+  .sushi-bubble .sushi-dish {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+.sushi-yum {
+  font-weight: 800;
+  color: #16703f;
+}
+
+.sushi-animal {
+  margin-top: 0.35rem;
+  font-size: 2.4rem;
+  line-height: 1.1;
+}
+
+.sushi-diner[data-served] .sushi-animal {
+  animation: sushi-happy 0.6s ease;
+}
+
+@keyframes sushi-happy {
+  40% {
+    transform: translateY(-6px) scale(1.08);
+  }
+}
+
+.sushi-diner-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+/* ---------- The belt ---------- */
+
+.sushi-belt {
+  position: relative;
+  height: 3.2rem;
+  margin: 0.4rem -0.5rem 0;
+  border-top: 4px solid #8b5e3c;
+  background: repeating-linear-gradient(90deg, #d5cfc4 0 26px, #bdb5a8 26px 28px);
+  animation: sushi-belt 1.6s linear infinite;
+}
+
+@keyframes sushi-belt {
+  to {
+    background-position: 28px 0;
+  }
+}
+
+.sushi-plate {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 2.6rem;
+  height: 2.6rem;
+  margin: -1.3rem 0 0 -1.3rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 3px var(--plate, #e8b04a),
+    0 2px 3px rgb(0 0 0 / 0.2);
+}
+
+/* Each plate has the rim colour of the person who made it. */
+.sushi-plate[data-colour='sky'] { --plate: var(--sky); }
+.sushi-plate[data-colour='meadow'] { --plate: var(--meadow); }
+.sushi-plate[data-colour='sunflower'] { --plate: #e0a826; }
+.sushi-plate[data-colour='apricot'] { --plate: var(--apricot); }
+.sushi-plate[data-colour='rose'] { --plate: var(--rose); }
+.sushi-plate[data-colour='lilac'] { --plate: var(--lilac); }
+.sushi-plate[data-colour='sea'] { --plate: var(--sea); }
+.sushi-plate[data-colour='slate'] { --plate: var(--slate); }
+
+.sushi-going-round {
+  left: -10%;
+  animation: sushi-round 12s linear infinite;
+}
+
+@keyframes sushi-round {
+  to {
+    left: 110%;
+  }
+}
+
+.sushi-arriving {
+  animation: sushi-arrive 1.2s ease-out both;
+}
+
+@keyframes sushi-arrive {
+  from {
+    left: -8%;
+  }
+  80% {
+    left: var(--to);
+    opacity: 1;
+  }
+  to {
+    left: var(--to);
+    opacity: 0;
+    transform: translateY(-1.2rem) scale(0.7);
+  }
+}
+
+.sushi-score {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.sushi-stars {
+  letter-spacing: -0.1em;
+}
+
+/* ---------- Your station ---------- */
+
+.sushi-station.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem;
+}
+
+.sushi-note {
+  margin: 0;
+  min-height: 1.5em;
+  font-weight: 650;
+  text-align: center;
+}
+
+.sushi-recipe {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.sushi-recipe li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sushi-work {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 0.6rem;
+}
+
+.sushi-board,
+.sushi-plate-now {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 5rem;
+  border-radius: var(--radius-lg);
+}
+
+.sushi-board {
+  background: #e9cfa5;
+  box-shadow: inset 0 0 0 3px #d4b17c;
+}
+
+.sushi-board .muted {
+  color: #6b5a48;
+}
+
+.sushi-plate-now {
+  border: 3px dashed var(--divider);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.sushi-on-plate {
+  padding: 0.15rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sushi-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr));
+  gap: 0.4rem;
+}
+
+.sushi-ingredient {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-height: 4.6rem;
+  padding: 0.35rem 0.2rem;
+  border: 1.5px solid var(--divider);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+
+.sushi-ingredient:active {
+  transform: scale(0.95);
+}
+
+.sushi-ingredient[data-glow],
+.btn.sushi-glow {
+  border-color: var(--sunflower);
+  box-shadow: 0 0 0 3px var(--sunflower-tint);
+  animation: sushi-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes sushi-glow {
+  50% {
+    box-shadow: 0 0 0 7px var(--sunflower-tint);
+  }
+}
+
+.sushi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+/* ---------- Closing time ---------- */
+
+.sushi-end.sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.2rem;
+  text-align: center;
+}
+
+.sushi-end h2,
+.sushi-end p {
+  margin: 0;
+}
+
+.sushi-end-art {
+  font-size: 3rem;
+}
+
+.sushi-waves {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* On a phone, keep Send in view: smaller shelf buttons, five to a row. */
+@media (max-width: 30rem) {
+  .sushi-station.sheet {
+    padding: 0.6rem;
+    gap: 0.5rem;
+  }
+
+  .sushi-board,
+  .sushi-plate-now {
+    min-height: 3.8rem;
+  }
+
+  .sushi-shelf {
+    grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr));
+    gap: 0.3rem;
+  }
+
+  .sushi-ingredient {
+    min-height: 3.9rem;
+    font-size: 0.75rem;
+  }
+
+  .sushi-ingredient-art {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sushi-belt,
+  .sushi-ingredient[data-glow],
+  .btn.sushi-glow,
+  .sushi-diner[data-served] .sushi-animal {
+    animation: none;
+  }
+
+  .sushi-going-round {
+    animation-duration: 40s;
+  }
+}

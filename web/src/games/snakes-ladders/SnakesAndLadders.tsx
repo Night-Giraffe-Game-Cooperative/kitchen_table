@@ -4,6 +4,7 @@
 // players take turns. Each age band has its own fixed board, in rules.ts.
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../../components/ui';
+import { useStore } from '../../lib/store';
 import type { Colour, Game, Me, Person } from '../../lib/types';
 import type { GameDef, GameProps, Mode, OptionsProps, PlayerSeat } from '../common';
 import { nameOf, playerSeats, seatOrder, startGame } from '../common';
@@ -22,6 +23,7 @@ import {
   ladders,
   latestRolls,
   newGame,
+  nextPlayers,
   rollTurn,
   rowsOf,
   sayRoll,
@@ -367,7 +369,8 @@ const Painted = memo(function Painted({ board, lit }: { board: Board; lit: Recor
   );
 });
 
-function Board({ game, play, me, people }: GameProps<State>) {
+function Board({ game, play, me, people, room }: GameProps<State>) {
+  const { toast } = useStore();
   const s = game.state;
   const b = s.board;
   const rows = rowsOf(b);
@@ -426,20 +429,16 @@ function Board({ game, play, me, people }: GameProps<State>) {
   async function playAgain() {
     setAgain(true);
     try {
-      let seats = { ...game.seats };
-      if (!coop) {
-        // The same players, with the next one starting.
-        const players = order.map((k) => game.seats[k]);
-        const seated = players.filter((p): p is number => typeof p === 'number');
-        const open = players.filter((p) => p === 'open') as 'open'[];
-        seats = playerSeats([...seated.slice(1), ...seated.slice(0, 1), ...open]);
-      }
+      // The same seats against the Night Giraffe; against each other, the same players with the next one starting.
+      const seats = coop ? { ...game.seats } : playerSeats(nextPlayers(order.map((k) => game.seats[k]), room?.member_ids));
       await startGame(game, TYPE, {
         mode: game.mode,
         seats,
         state: { ...newGame(b, orderOf({ seats })), band: s.band },
         ...(game.title ? { title: game.title } : {}),
       });
+    } catch (e) {
+      toast((e as Error).message, 'danger');
     } finally {
       setAgain(false);
     }

@@ -4,7 +4,7 @@
 // turns the two back over first. Together, the family finds every pair in as
 // few turns as it can. Taking turns, a pair scores and earns another go, a miss
 // passes the turn, and the most pairs wins.
-import { leaders, listNames, nextSeat, placings, shuffle } from '../common';
+import { leaders, listNames, nextSeat, placings, shuffle, type PlayerSeat } from '../common';
 import type { Band } from '../bands';
 import type { Picture } from '../photos';
 
@@ -214,6 +214,17 @@ export function flip(s: PairsState, card: number, who: Turner): PairsState | nul
   }
   const turn = versus && who.order ? nextSeat(who.order, s.turn) : s.turn;
   return { ...base, up: [first, card], turns, last, turn };
+}
+
+/**
+ * Who plays the next game taking turns: the same players with the next one
+ * starting. Anyone no longer in the chat is left out, as the server won't
+ * seat them, and if only one player is left there is a place for someone to join.
+ */
+export function nextPlayers(players: number[], members?: number[]): PlayerSeat[] {
+  const out: PlayerSeat[] = [...players.slice(1), ...players.slice(0, 1)].filter((id) => !members || members.includes(id));
+  while (out.length < 2) out.push('open');
+  return out;
 }
 
 /** Pairs found by each finder, keyed as strings: seats taking turns, people's ids together. */

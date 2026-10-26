@@ -23,6 +23,7 @@ import {
   storySummary,
   toggleStar,
   totals,
+  waitsOn,
   type Line,
   type StoryVersus,
 } from './versus';
@@ -172,7 +173,8 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
     e.preventDefault();
     const line = text.trim().replace(/\s+/g, ' ');
     if (!line) return;
-    play.move((st) => {
+    play.move((st, g) => {
+      if (g.status !== 'active') return null;
       const lines = [...st.lines, { u: me.id, text: line }];
       const finished = lines.length >= st.length;
       return finished ? { state: { ...st, lines }, status: 'finished', summary: summary(lines) } : { state: { ...st, lines } };
@@ -202,6 +204,10 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
         })}
         {done && <p className="story-end">The End</p>}
       </article>
+
+      {done && text.trim() && (
+        <p className="notice notice-info">The story ended before your line went in. Here it is, so it isn't lost: "{text.trim()}"</p>
+      )}
 
       <div className="story-tools">
         <div className="story-writers" role="group" aria-label="Writers">
@@ -620,4 +626,6 @@ export const storyChain: GameDef<State, Options> = {
     const by = last ? ` · last line by ${nameOf(people, last.u, me)}` : '';
     return `${s.lines.length} of ${s.length} lines${by}`;
   },
+  // Together, anyone can write next. Against each other, the writer whose turn it is, then everyone still to give stars.
+  waitingOn: (g, me) => g.mode === 'versus' && waitsOn(g.state as StoryVersus, g.seats, me),
 };

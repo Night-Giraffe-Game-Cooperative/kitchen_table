@@ -60,6 +60,9 @@ export const sameAnswer = (a: string, b: string) => key(a, MAX_ANSWER) === key(b
 
 export const sameQuestion = (a: string, b: string) => key(a, MAX_QUESTION) === key(b, MAX_QUESTION);
 
+/** Whether anything has been written in a draft yet. */
+export const begun = (d: Draft) => [d.text, d.right, ...d.wrong].some((t) => t.trim() !== '');
+
 /** What a question still needs before it can be saved, in words a child can follow; null when it's ready. */
 export function draftProblem(d: Draft, choices: number): string | null {
   if (!clean(d.text, MAX_QUESTION)) return 'Write a question, or tap an idea.';

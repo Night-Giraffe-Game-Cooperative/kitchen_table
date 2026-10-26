@@ -15,6 +15,8 @@ import { pairs } from './pairs/Pairs';
 import { fourInARow } from './four-in-a-row/FourInARow';
 import { dotsAndBoxes } from './dots-boxes/DotsAndBoxes';
 import { snakesAndLadders } from './snakes-ladders/SnakesAndLadders';
+import { bonsai } from './bonsai/Bonsai';
+import { sushiTrain } from './sushi/SushiTrain';
 
 /**
  * The games on shelves, for the New game picker. Games played together come
@@ -24,6 +26,8 @@ export const gameShelves: { title: string; games: GameDef[] }[] = [
   { title: 'Drawing and stories', games: [doodleTogether, doodleTelephone, storyChain, doodleDuel] },
   { title: 'Puzzles, memory and quizzes', games: [wordGarden, picturePuzzle, pairs, wheresGiraffe, familyQuiz] },
   { title: 'Board games', games: [snakesAndLadders, fourInARow, dotsAndBoxes, chess, backgammon] },
+  { title: 'Cooking', games: [sushiTrain] },
+  { title: 'Just for you', games: [bonsai] },
 ];
 
 export const gameDefs: GameDef[] = gameShelves.flatMap((s) => s.games);

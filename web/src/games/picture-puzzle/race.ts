@@ -2,7 +2,7 @@
 // each other it's a race: everyone gets the same jumble on a board of their
 // own, the fewest swaps wins, and on a tie the quicker puzzler wins. Your time
 // runs from when you press Start to your last swap.
-import { listNames, placings, seatOrder, shuffle } from '../common';
+import { listNames, placings, seatOf, seatOrder, shuffle } from '../common';
 import type { Band } from '../bands';
 
 /** A shuffle where no piece starts in its own place. */
@@ -31,6 +31,20 @@ export function fewestSwaps(tiles: number[]): number {
     for (let j = i; !seen[j]; j = tiles[j]) seen[j] = true;
   }
   return tiles.length - loops;
+}
+
+/**
+ * Puts a piece in a place, swapping it with the piece there. It goes by the
+ * piece, not the space it was picked up from, so if someone else moved it in
+ * the meantime it's still the piece you picked up that moves. Null if either
+ * piece is already in its right place, which stays put.
+ */
+export function placePiece(tiles: number[], piece: number, to: number): number[] | null {
+  const from = tiles.indexOf(piece);
+  if (from < 0 || from === to || tiles[to] === undefined || from === piece || tiles[to] === to) return null;
+  const next = [...tiles];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
 }
 
 export interface RaceBoard {
@@ -77,6 +91,12 @@ export function swap(s: RaceState, seat: string, a: number, b: number, now: numb
 /** Whether every place is taken and everyone in one has finished. */
 export function everyoneFinished(s: RaceState, seats: Record<string, unknown>): boolean {
   return seatOrder(seats).every((k) => typeof seats[k] === 'number' && hasFinished(s.boards[k]));
+}
+
+/** Whether the race is waiting on this player: their puzzle isn't started or isn't finished. */
+export function waitsOn(s: RaceState, seats: Record<string, unknown>, me: number): boolean {
+  const seat = seatOf(seats, me);
+  return !!seat && !hasFinished(s.boards[seat]);
 }
 
 export interface Placing {

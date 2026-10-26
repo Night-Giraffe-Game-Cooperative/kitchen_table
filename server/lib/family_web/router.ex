@@ -27,6 +27,8 @@ defmodule FamilyWeb.Router do
     post "/session", SessionController, :create
     post "/session/code", SessionController, :code
     delete "/session", SessionController, :delete
+    # The Android app checks for notifications with its own key, not the cookie.
+    get "/push/inbox", PushController, :inbox
 
     scope "/" do
       pipe_through :signed_in
@@ -98,6 +100,7 @@ defmodule FamilyWeb.Router do
 
         get "/push", PushController, :show
         post "/push/subscriptions", PushController, :subscribe
+        post "/push/app", PushController, :app
         delete "/push/subscriptions", PushController, :unsubscribe
         delete "/push/devices/:id", PushController, :remove_device
         post "/push/test", PushController, :test
@@ -113,6 +116,10 @@ defmodule FamilyWeb.Router do
         post "/goals", RewardController, :create_goal
         patch "/goals/:id", RewardController, :update_goal
         delete "/goals/:id", RewardController, :delete_goal
+
+        get "/phrases", PhraseController, :index
+        put "/phrases/known", PhraseController, :mark
+    put "/phrases/trip", PhraseController, :trip
       end
     end
   end

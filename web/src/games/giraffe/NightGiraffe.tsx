@@ -12,9 +12,17 @@ const coat = '#f7c95f';
 const patch = '#c97f35';
 const horn = '#7a4a22';
 
-export function NightGiraffe({ className }: { className?: string }) {
+/** Where and how big, when he's drawn inside another picture. */
+interface Place {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
+export function NightGiraffe({ className, ...place }: { className?: string } & Place) {
   return (
-    <svg className={className} viewBox="0 0 100 120" aria-hidden="true" focusable="false">
+    <svg className={className} {...place} viewBox="0 0 100 120" aria-hidden="true" focusable="false">
       {/* Neck, running off the bottom */}
       <path d="M37 66 C36 86 35 104 33 122 H67 C65 104 64 86 63 66 Z" fill={coat} stroke="#a86a2c" strokeWidth="1.2" />
       <path d="M38 84 q6 -5 10 0 q2 6 -4 8 q-6 0 -6 -8z" fill={patch} />

@@ -164,3 +164,20 @@ export function playColumn(moves: readonly number[], col: number): number[] | nu
   if (outcomeOf(grid) || !canDrop(grid, col)) return null;
   return [...moves, col];
 }
+
+/** Whether two lists of moves are the same game so far. Counting them isn't enough: a take back and a new counter leave as many. */
+export const sameMoves = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((col, i) => col === b[i]);
+
+/**
+ * The moves after taking back `side`'s last turn and the reply after it. Null
+ * when `side` hasn't had a turn yet, or when the moves aren't the ones `seen`
+ * when take back was pressed: someone has moved or taken back since, and that
+ * isn't theirs to undo.
+ */
+export function takeBackTo(moves: readonly number[], seen: readonly number[], side: Disc): number[] | null {
+  if (!sameMoves(moves, seen)) return null;
+  let back = moves.slice();
+  do back = back.slice(0, -1);
+  while (back.length && turnOf(back) !== side);
+  return back.length < moves.length && turnOf(back) === side ? back : null;
+}

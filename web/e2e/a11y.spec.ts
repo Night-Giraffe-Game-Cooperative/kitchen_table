@@ -100,6 +100,7 @@ for (const scheme of ['light', 'dark'] as const)
       const { rooms } = await api<{ rooms: { id: number; kind: string; member: boolean }[] }>(page, '/api/rooms');
       for (const room of rooms.slice(0, 3)) await visit(page, `#/chats/${room.id}`, `chat ${room.kind} (${tag})`);
       await visit(page, '#/games', `games (${tag})`);
+      await visit(page, '#/learn', `learn (${tag})`);
       const { games } = await api<{ games: { id: number; type: string; mode: string }[] }>(page, '/api/games');
       const seen = new Set<string>();
       for (const game of games) {
@@ -136,7 +137,7 @@ for (const scheme of ['light', 'dark'] as const)
     const page = await signIn(browser, 'alex+mia@example.com', 'unicorns are best', phone, scheme);
     const tag = `kid phone ${scheme}`;
     await check(page, `chats (${tag})`);
-    for (const hash of ['#/games', '#/calendar', '#/calendar/tasks', '#/calendar/homework', '#/calendar/rewards', '#/people', '#/me']) await visit(page, hash, `${hash} (${tag})`);
+    for (const hash of ['#/games', '#/learn', '#/calendar', '#/calendar/tasks', '#/calendar/homework', '#/calendar/rewards', '#/people', '#/me']) await visit(page, hash, `${hash} (${tag})`);
     const { me } = await api<{ me: { id: number } }>(page, '/api/me');
     await visit(page, `#/people/${me.id}`, `own page (${tag})`);
     await page.context().close();
@@ -216,6 +217,7 @@ test('small phones and large text: nothing runs off the side', async ({ browser 
     ...rooms.slice(0, 3).map((r) => `#/chats/${r.id}`),
     '#/games',
     ...games.map((g) => `#/games/${g.id}`),
+    '#/learn',
     '#/calendar',
     '#/calendar/month',
     '#/calendar/tasks',
@@ -273,6 +275,7 @@ for (const [sizeName, size, text, who, password] of [
       ...rooms.map((r) => `#/chats/${r.id}`),
       '#/games',
       ...games.map((g) => `#/games/${g.id}`),
+      '#/learn',
       '#/calendar',
       '#/calendar/month',
       '#/calendar/tasks',
@@ -290,6 +293,26 @@ for (const [sizeName, size, text, who, password] of [
       await page.evaluate((h) => (window.location.hash = h), hash);
       await page.waitForTimeout(400);
       await look(hash);
+    }
+    // Learn's other tabs.
+    await page.evaluate(() => (window.location.hash = '#/learn'));
+    for (const name of ['Signs', 'Practise', 'Characters']) {
+      await page.getByRole('radio', { name, exact: true }).click();
+      await page.waitForTimeout(200);
+      await look(`Learn: ${name}`);
+    }
+    await page.getByRole('radio', { name: 'Travel', exact: true }).click();
+    await page.getByRole('button', { name: 'Lucky cat', exact: true }).click();
+    await look('Learn: spot it');
+    await page.getByRole('radio', { name: /Bullet trains/ }).click();
+    await page.getByRole('button', { name: 'Bullet train quiz' }).click();
+    await page.locator('.quiz-choice').first().click();
+    await look('Learn: bullet train quiz');
+    if (who === 'alex@example.com') {
+      await page.getByRole('radio', { name: /Driving/ }).click();
+      await page.getByRole('button', { name: 'Take the road test' }).click();
+      await page.locator('.quiz-choice').first().click();
+      await look('Learn: driving and the road test');
     }
     // The New game list, and every game's setup.
     await page.evaluate(() => (window.location.hash = '#/games'));

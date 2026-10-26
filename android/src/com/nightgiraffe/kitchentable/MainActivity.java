@@ -17,6 +17,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.Base64;
 import android.util.TypedValue;
@@ -44,6 +45,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,13 +55,17 @@ import java.util.Locale;
 /**
  * Kitchen Table, full screen, for tablets whose home screen won't take a browser
  * shortcut. It opens the family's own computer and does what the browser would:
- * camera and microphone for video calls, photos to send, downloads, and the
- * home-made certificate (trusted the first time, then held to it).
+ * camera and microphone for video calls, photos to send, downloads, the
+ * home-made certificate (trusted the first time, then held to it), and
+ * notifications, which it checks for itself (Inbox).
  */
 public class MainActivity extends Activity {
     private static final int ASK_CALL = 1;
     private static final int ASK_PHOTO = 2;
     private static final int PICK_PHOTO = 3;
+    private static final int ASK_NOTIFY = 4;
+    // Manifest.permission.POST_NOTIFICATIONS, which Android 13 and later ask about.
+    private static final String NOTIFY = "android.permission.POST_NOTIFICATIONS";
 
     private static final int PAPER = Color.rgb(245, 243, 238);
     private static final int INK = Color.rgb(29, 29, 31);
@@ -73,6 +80,7 @@ public class MainActivity extends Activity {
     private Button trustButton;
     private boolean failed;
 
+    private Speaker speaker;
     private PermissionRequest waitingCall;
     private ValueCallback<Uri[]> waitingPhoto;
     private WebChromeClient.FileChooserParams photoParams;
@@ -83,6 +91,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         prefs = getSharedPreferences("kitchen-table", MODE_PRIVATE);
+        Inbox.alive = true;
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(PAPER);
@@ -95,7 +104,22 @@ public class MainActivity extends Activity {
         root.addView(problem, fill());
         setContentView(root);
 
-        if (saved == null || web.restoreState(saved) == null) web.loadUrl(home() + "/");
+        if (saved == null || web.restoreState(saved) == null) {
+            if (!open(getIntent())) web.loadUrl(home() + "/");
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        open(intent);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Inbox.keepChecking(this);
     }
 
     @Override
@@ -118,7 +142,9 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         if (waitingCall != null) waitingCall.deny();
         if (waitingPhoto != null) waitingPhoto.onReceiveValue(null);
+        speaker.shutdown();
         web.destroy();
+        if (isFinishing()) Inbox.closed(this);
         super.onDestroy();
     }
 
@@ -133,12 +159,17 @@ public class MainActivity extends Activity {
         s.setSupportMultipleWindows(false);
         s.setUserAgentString(s.getUserAgentString() + " KitchenTableApp/" + version());
         CookieManager.getInstance().setAcceptCookie(true);
+        // Reading aloud: stories, and holiday phrases in their own language.
+        speaker = new Speaker(this);
+        web.addJavascriptInterface(speaker, "KitchenTableVoice");
+        // Notifications, which the app checks for itself.
+        web.addJavascriptInterface(new Notices(this), "KitchenTableNotifications");
 
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                // "Open in Chrome", for what only the browser can do, like notifications.
+                // "Open in Chrome", for what only the browser can do.
                 if (isHome(url) && "browser".equals(url.getQueryParameter("open"))) {
                     openInBrowser(url.buildUpon().clearQuery().build());
                     return true;
@@ -311,6 +342,57 @@ public class MainActivity extends Activity {
             waitingCall = null;
         } else if (code == ASK_PHOTO) {
             choosePhoto();
+        } else if (code == ASK_NOTIFY) {
+            answerNotify();
+        }
+    }
+
+    // Notifications: switched on under Me, checked for by the app itself (Inbox)
+
+    /** A tapped notification opens the app at its chat, call or game. */
+    private boolean open(Intent intent) {
+        Uri url = intent != null ? intent.getData() : null;
+        // Only a place in the app itself, never something to download, whoever sent it.
+        if (url == null || !isHome(url) || url.getQuery() != null || !(url.getPath() == null || url.getPath().isEmpty() || url.getPath().equals("/"))) {
+            return false;
+        }
+        String hash = url.getEncodedFragment() != null ? url.getEncodedFragment() : "/";
+        String now = web.getUrl();
+        problem.setVisibility(View.GONE);
+        if (!failed && now != null && isHome(Uri.parse(now))) {
+            // The page is already open: just go to the right place in it.
+            web.evaluateJavascript("location.hash = " + JSONObject.quote("#" + hash), null);
+        } else {
+            web.loadUrl(home() + "/#" + hash);
+        }
+        return true;
+    }
+
+    /** Whether Android will still ask "Allow notifications?" (it stops after two no's). */
+    boolean canAskToNotify() {
+        if (Build.VERSION.SDK_INT < 33 || has(NOTIFY)) return false;
+        return !prefs.getBoolean("asked-to-notify", false) || shouldShowRequestPermissionRationale(NOTIFY);
+    }
+
+    void askToNotify() {
+        if (Build.VERSION.SDK_INT >= 33 && !has(NOTIFY)) {
+            prefs.edit().putBoolean("asked-to-notify", true).apply();
+            requestPermissions(new String[] {NOTIFY}, ASK_NOTIFY);
+        } else {
+            answerNotify();
+        }
+    }
+
+    private void answerNotify() {
+        web.evaluateJavascript("window.dispatchEvent(new CustomEvent('kitchentable:notifications', {detail: "
+                + Inbox.allowed(this) + "}))", null);
+    }
+
+    void openNotificationSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        } catch (Exception e) {
+            Toast.makeText(this, "Ask a grown-up to allow notifications for Kitchen Table in Settings.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -502,6 +584,10 @@ public class MainActivity extends Activity {
         return a;
     }
 
+    boolean isHome(String address) {
+        return address != null && isHome(Uri.parse(address));
+    }
+
     private boolean isHome(Uri url) {
         if (url == null || url.getHost() == null) return false;
         Uri h = Uri.parse(home());
@@ -516,7 +602,7 @@ public class MainActivity extends Activity {
     }
 
     /** The home-made certificate is only ever accepted for a computer on the home network. */
-    private static boolean isAtHome(String host) {
+    static boolean isAtHome(String host) {
         if (host == null) return false;
         String h = host.toLowerCase(Locale.ROOT);
         if (h.endsWith(".local") || h.endsWith(".lan") || h.endsWith(".home") || h.equals("localhost")) return true;
@@ -539,11 +625,14 @@ public class MainActivity extends Activity {
                 der = certificate.getX509Certificate().getEncoded();
             }
             if (der == null) der = SslCertificate.saveState(certificate).getByteArray("x509-certificate");
-            if (der == null) return null;
-            return Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(der), Base64.NO_WRAP);
+            return der != null ? fingerprint(der) : null;
         } catch (Exception e) {
             return null;
         }
+    }
+
+    static String fingerprint(byte[] der) throws java.security.NoSuchAlgorithmException {
+        return Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(der), Base64.NO_WRAP);
     }
 
     // Little view helpers

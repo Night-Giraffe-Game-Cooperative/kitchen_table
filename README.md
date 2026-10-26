@@ -160,7 +160,7 @@ side's chess and backgammon moves, a warning before a piece is left to be
 taken, letters read aloud, the shape of a story. It's remembered for each game
 on each device.
 
-The New game list puts the games on three shelves.
+The New game list puts the games on five shelves.
 
 | Game | How it's played |
 | --- | --- |
@@ -181,6 +181,39 @@ The New game list puts the games on three shelves.
 | Dots and Boxes | Draw lines and claim boxes, against the computer or up to four players; the board grows with age |
 | Chess | Against a friendly computer (its strength set by age), as the whole family or just you, or each other |
 | Backgammon | The same: the computer, as the family or just you, or each other |
+| **Cooking** | |
+| Sushi Train | Everyone in the chat runs a sushi bar together. Customers show what they'd like; each person makes dishes at their own station (rice and a topping for nigiri, seaweed, rice and fillings rolled up for maki, miso soup and edamame) and sends their plate down the belt. Each wave orders something trickier, quick waves earn stars, and the dishes have their Japanese names. For the youngest, what to tap next glows |
+| **Just for you** | |
+| Bonsai | A little tree of your own (maple, pine or cherry blossom), painted in watercolour. Water it, trim it, feed it and sweep up its leaves a few minutes a day; it grows and changes with the real seasons, visitors drop by (some nights the Night Giraffe), and looking after it unlocks pots and things to put beside it. Nobody else sees it, and it never dies |
+
+**Learn.** Phrases and characters for a family holiday, in Japanese or French.
+Phrases come in topics (hello and goodbye, manners, food, getting around,
+shops, help, numbers), each with the words, how to say them in English
+sounds, and a speaker to hear them, slowly too. Signs to spot (exit, toilets,
+open, closed) are their own tab, and Japanese adds hiragana and katakana: a
+chart to tap and hear, and a quiz. Everyone presses "I know it" on what
+they've learned, and the family can see who knows what, so learning it is a
+shared thing. There's a phrase of the day, flashcards that start with what
+you don't know yet, and an age choice: 5 to 7 keeps to the simplest
+phrases, and older ages add more. Phones and computers read aloud with their
+own voices; the Android app does too (see
+[part 5 of Get going](docs/getting-started.md#5-the-android-app-for-kids-tablets)).
+
+A grown-up can set when the family goes, and then Learn counts the sleeps
+until the holiday for everyone at home, with a new fact about Japan each
+day.
+
+Japanese also has a Travel tab. Spot it is a bingo card of sixteen things to
+find on the trip (a shrine gate, a deer in Nara, a toilet with buttons):
+everyone ticks what they spot, sees whose faces are on each square, and four
+in a row is bingo. Bullet trains are for everyone: the
+words in their own topic, station signs (ticket gates, platform, carriage,
+reserved seats), what's good to know (where to queue, which side for Mount
+Fuji, big suitcases) and a quiz. Driving is for grown-ups only: Japan's road
+signs drawn as you'll see them, with what each means and how it differs from
+home, the rules that catch visitors out, and a ten-question road test with
+the real test's pass mark of 90%. Passing the quiz or the test shows on the
+family's progress.
 
 **Calendar and tasks.** A family calendar with Today, Month, Week, Homework
 and Rewards views. Events can be all day or timed, run over several days,
@@ -252,7 +285,10 @@ notifications. Each morning, grown-ups get a summary of the day (what's on,
 what to remember, homework due, jobs) that opens Today, and at eight in the
 evening one about tomorrow; anyone can change their times or switch either
 off. On an iPhone or iPad they need the app on the Home Screen
-first (iOS 16.4 or later). See [Notifications](docs/getting-started.md#8-notifications) in the guide.
+first (iOS 16.4 or later). The Android app shows them too, with the same
+switches under Me, and without Google: it checks for them itself, about
+every minute while it's open or in the background, otherwise every 15
+minutes or so, as Android allows. See [Notifications](docs/getting-started.md#8-notifications) in the guide.
 
 **Your things.** Anyone can download what's theirs from Me: their messages,
 reactions, photos and doodles, events, tasks, games and settings, in a zip

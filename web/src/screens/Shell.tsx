@@ -5,6 +5,7 @@ import { Icon, type IconName } from '../components/icons';
 import { Avatar } from '../components/ui';
 import { Chats } from './Chats';
 import { GamesHub } from './Games';
+import { Learn } from './Learn';
 import { CalendarScreen, seesCalendar } from './Calendar';
 import { switchedOffBy } from '../lib/permissions';
 import { People } from './People';
@@ -37,6 +38,7 @@ export function Shell() {
   const nav: { route: Route; label: string; icon: IconName; badge?: number; badgeText?: string }[] = [
     { route: { name: 'chats' }, label: 'Chats', icon: 'chat', badge: unread },
     ...(!switchedOffBy(myBubble, 'play_games') ? [{ route: { name: 'games' } as Route, label: 'Games', icon: 'games' as IconName, badge: myTurns }] : []),
+    { route: { name: 'learn' }, label: 'Learn', icon: 'globe' },
     ...(seesCalendar(me)
       ? [{ route: { name: 'calendar' } as Route, label: 'Calendar', icon: 'calendar' as IconName }]
       : me.permissions.tasks
@@ -109,6 +111,7 @@ export function Shell() {
         )}
         {route.name === 'chats' && <Chats roomId={route.roomId} />}
         {route.name === 'games' && <GamesHub gameId={route.gameId} />}
+        {route.name === 'learn' && <Learn />}
         {route.name === 'calendar' && <CalendarScreen view={route.view} linkAccount={route.linkAccount} />}
         {route.name === 'people' && <People personId={route.personId} />}
         {route.name === 'outbox' && <Outbox />}

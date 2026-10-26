@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { begin, everyoneFinished, fewestSwaps, formatTime, isSolved, newRace, raceSummary, scramble, standings, swap, type RaceState } from './race';
+import { begin, everyoneFinished, fewestSwaps, formatTime, isSolved, newRace, placePiece, raceSummary, scramble, standings, swap, waitsOn, type RaceState } from './race';
 
 const media = { url: '/media/x.jpg', width: 800, height: 600 };
 
@@ -36,6 +36,24 @@ describe('Picture Puzzle', () => {
     expect(fewestSwaps([1, 0, 3, 2])).toBe(2); // two pairs
     expect(fewestSwaps([1, 2, 3, 0])).toBe(3); // one loop of four
     expect(fewestSwaps([1, 2, 0, 4, 3])).toBe(3);
+  });
+
+  it('moves the piece that was picked up, even if someone else moved it meanwhile', () => {
+    // Mia picks up piece 5 from space 0, then Dad swaps spaces 0 and 1.
+    const tiles = [5, 2, 0, 1, 3, 4];
+    const dad = placePiece(tiles, tiles[0], 1)!;
+    expect(dad).toEqual([2, 5, 0, 1, 3, 4]);
+    // Mia puts her piece down in space 5: it's still piece 5 that moves, from where Dad left it, not Dad's piece 2.
+    expect(placePiece(dad, 5, 5)).toEqual([2, 4, 0, 1, 3, 5]);
+  });
+
+  it('leaves pieces in their right places alone', () => {
+    const tiles = [1, 0, 2, 4, 3];
+    expect(placePiece(tiles, 2, 0)).toBeNull(); // piece 2 is home
+    expect(placePiece(tiles, 1, 2)).toBeNull(); // so is the piece in space 2
+    expect(placePiece(tiles, 1, 0)).toBeNull(); // already there
+    expect(placePiece(tiles, 1, 9)).toBeNull();
+    expect(placePiece(tiles, 1, 1)).toEqual([0, 1, 2, 4, 3]);
   });
 
   it('careful swapping matches the fewest swaps', () => {
@@ -121,6 +139,15 @@ describe('Picture Puzzle race', () => {
     s = solve(begin(s, 'p2', 0)!, 'p2', 1);
     expect(everyoneFinished(s, seats)).toBe(false); // Gran's place is still open
     expect(everyoneFinished(s, { p1: 1, p2: 2 })).toBe(true);
+  });
+
+  it('waits on each player until their puzzle is finished', () => {
+    let s = newRace(media, 3);
+    expect([1, 2, 3].map((id) => waitsOn(s, seats, id))).toEqual([true, true, false]);
+    s = begin(s, 'p1', 0)!;
+    expect(waitsOn(s, seats, 1)).toBe(true);
+    s = solve(s, 'p1', 1);
+    expect([1, 2].map((id) => waitsOn(s, seats, id))).toEqual([false, true]);
   });
 
   it('writes times for people', () => {

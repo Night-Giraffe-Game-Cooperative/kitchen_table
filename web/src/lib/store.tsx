@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Presence } from 'phoenix';
 import { api } from './api';
 import { connect, disconnect, join, onConnectionChange } from './socket';
-import { clearNotifications, disablePush, refreshPush } from './push';
+import { checkSoon, clearNotifications, disablePush, refreshPush } from './push';
 import type { Bubble, CallInfo, Friendship, Game, Me, Message, Person, Room } from './types';
 
 export interface Toast {
@@ -163,6 +163,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
     mine.on('rooms_changed', () => refreshRooms().catch(() => {}));
     mine.on('games_changed', () => refreshGames().catch(() => {}));
     mine.on('room_activity', ({ room_id, message }: { room_id: number; message: Message }) => {
+      if (message.user_id !== session.me.id) checkSoon();
       setRooms((rs) => {
         const known = rs.some((r) => r.id === room_id);
         if (!known) {
@@ -185,6 +186,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
       });
     });
     mine.on('call_ring', ({ room_id, by }: { room_id: number; by: number }) => {
+      checkSoon();
       rangAt.current.set(room_id, Date.now());
       if (activeCall.current !== room_id) setRing({ roomId: room_id, by });
     });
@@ -195,6 +197,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
       if (!call || call.user_ids.includes(session.me.id)) setRing((rg) => (rg?.roomId === room_id ? null : rg));
     });
     mine.on('your_turn', (game: Game) => {
+      checkSoon();
       // No need to say so to someone already looking at the game.
       if (window.location.hash === `#/games/${game.id}`) return;
       toast(`Your turn in ${gameName(game.type)}.`, 'info', { label: 'Play', href: `#/games/${game.id}` });

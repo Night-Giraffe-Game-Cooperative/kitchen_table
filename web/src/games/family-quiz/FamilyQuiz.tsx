@@ -5,6 +5,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { confirmFirst } from '../../components/confirm';
 import { Avatar, Button, Field, IconButton, Input, Segmented } from '../../components/ui';
+import { useStore } from '../../lib/store';
 import type { Game, Me, Person, Room } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps } from '../common';
 import { listNames, nameOf, startGame } from '../common';
@@ -16,6 +17,7 @@ import {
   MAX_ANSWER,
   MAX_QUESTION,
   addQuestion,
+  begun,
   canStart,
   choicesFor,
   draftProblem,
@@ -138,6 +140,13 @@ function Board({ game, play, me, people, room }: GameProps<State>) {
   const answered = s.phase === 'answering' ? toAnswer(s, me.id).length - left(s, me.id).length : 0;
   const finishedMe = hasFinished(s, me.id);
   const startable = canStart(s, everyone, early);
+  // A question half written when the answering starts can't be saved, so say so rather than have it just vanish.
+  const unsaved = useRef(false);
+  const [leftOut, setLeftOut] = useState(false);
+  useEffect(() => {
+    if (s.phase === 'answering' && unsaved.current) setLeftOut(true);
+    unsaved.current = false;
+  }, [s.phase]);
 
   // A writing tip is no use once the answering starts.
   useEffect(() => tips.dismiss(), [s.phase]);
@@ -159,8 +168,23 @@ function Board({ game, play, me, people, room }: GameProps<State>) {
         {statusLine(game, me.id, people, me.permissions.play_games)}
       </p>
       {canPlay && <TipNote tip={tips.tip} onClose={tips.dismiss} />}
+      {canPlay && leftOut && answered === 0 && (
+        <p className="notice notice-info">The quiz started before your question was saved, so it isn't in this one. You can still answer everyone else's.</p>
+      )}
       {s.phase === 'writing' && !done ? (
-        <Writing game={game} play={play} me={me} people={people} room={room} everyone={everyone} early={early} learn={learn} />
+        <Writing
+          game={game}
+          play={play}
+          me={me}
+          people={people}
+          room={room}
+          everyone={everyone}
+          early={early}
+          learn={learn}
+          onDraft={(b) => {
+            unsaved.current = b;
+          }}
+        />
       ) : !done || pinned ? (
         <Answering game={game} play={play} me={me} people={people} room={room} pinned={pinned} setPinned={setPinned} learn={learn} />
       ) : (
@@ -218,7 +242,8 @@ function Writing({
   everyone,
   early,
   learn,
-}: GameProps<State> & { everyone: number[]; early: boolean; learn: boolean }) {
+  onDraft,
+}: GameProps<State> & { everyone: number[]; early: boolean; learn: boolean; onDraft: (begun: boolean) => void }) {
   const s = game.state;
   const band = bandOf(s);
   const canPlay = me.permissions.play_games;
@@ -278,6 +303,7 @@ function Writing({
           colour={me.colour}
           busy={play.busy}
           onSave={save}
+          onDraft={onDraft}
         />
       )}
 
@@ -358,6 +384,7 @@ function QuestionWriter({
   colour,
   busy,
   onSave,
+  onDraft,
 }: {
   band: Band;
   /** Hints at every step: for the younger bands and learn mode. */
@@ -367,6 +394,8 @@ function QuestionWriter({
   colour: string;
   busy: boolean;
   onSave: (d: Draft) => Promise<boolean>;
+  /** Whether a question has been started and not saved. */
+  onDraft: (begun: boolean) => void;
 }) {
   const choices = choicesFor[band];
   const [d, setD] = useState<WriterDraft>(() => blank(choices));
@@ -382,6 +411,10 @@ function QuestionWriter({
     : d.wrong.some((w) => w.trim())
       ? `Picked for you from the list. Tap the arrows to swap ${choices === 2 ? 'it' : 'one'}, or type your own.`
       : 'These fill in by themselves when you tap the right answer. Or type your own.';
+
+  useEffect(() => {
+    onDraft(begun(d));
+  }, [d]);
 
   function idea(st: Starter) {
     const set = st.chips ?? null;
@@ -405,6 +438,8 @@ function QuestionWriter({
     setTried(true);
     if (problem || busy) return;
     if (await onSave(d)) {
+      // Straight away: saving the last question takes this form away before the draft clears.
+      onDraft(false);
       setD(blank(choices));
       setTried(false);
     }
@@ -741,6 +776,7 @@ function cheer(share: number): string {
 }
 
 function Results({ game, me, people }: { game: Game<State>; me: Me; people: Map<number, Person> }) {
+  const { toast } = useStore();
   const s = game.state;
   const [again, setAgain] = useState(false);
   const total = familyTotal(s);
@@ -755,6 +791,8 @@ function Results({ game, me, people }: { game: Game<State>; me: Me; people: Map<
     setAgain(true);
     try {
       await startGame(game, TYPE, { mode: 'coop', seats: {}, state: { ...newQuiz(me.id, s.each), band: s.band } });
+    } catch (e) {
+      toast((e as Error).message, 'danger');
     } finally {
       setAgain(false);
     }

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Button, Segmented } from '../../components/ui';
 import { canSpeak, speak } from '../../lib/speech';
+import { useStore } from '../../lib/store';
 import type { Game, Media } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, nextSeat, playerSeats, seatOf, seatOrder, startGame } from '../common';
@@ -22,6 +23,7 @@ import {
   layoutFor,
   missShowing,
   newGame,
+  nextPlayers,
   pairsFound,
   pairsText,
   ratingText,
@@ -107,7 +109,8 @@ function useFirstLook(gameId: number, wanted: boolean) {
 
 const seatedOf = (g: Game<PairsState>) => seatOrder(g.seats).filter((k) => typeof g.seats[k] === 'number');
 
-function Board({ game, play, me, people }: GameProps<PairsState>) {
+function Board({ game, play, me, people, room }: GameProps<PairsState>) {
+  const { toast } = useStore();
   const s = game.state;
   const versus = game.mode === 'versus';
   const done = game.status === 'finished';
@@ -213,11 +216,10 @@ function Board({ game, play, me, people }: GameProps<PairsState>) {
         return;
       }
       // The same players, and the next game opens with the next player.
-      const players: PlayerSeat[] = seated.map((k) => game.seats[k] as number);
-      const turned = [...players.slice(1), ...players.slice(0, 1)];
-      if (turned.length < 2) turned.push('open');
-      const seats = playerSeats(turned);
+      const seats = playerSeats(nextPlayers(seated.map((k) => game.seats[k] as number), room?.member_ids));
       await startGame(game, 'pairs', { mode: 'versus', seats, state: newGame({ set: s.set, band, photos: s.photos, order: seatOrder(seats) }) });
+    } catch (e) {
+      toast((e as Error).message, 'danger');
     } finally {
       setAgain(false);
     }

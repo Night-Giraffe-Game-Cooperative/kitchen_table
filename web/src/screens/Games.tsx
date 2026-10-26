@@ -27,10 +27,10 @@ function GameList() {
   const [creating, setCreating] = useState<false | { type?: string }>(false);
   const mine = games.filter((g) => isMyTurn(g, me.id));
   const playing = games.filter((g) => g.status === 'active' && !isMyTurn(g, me.id));
-  // Games you're in, as yourself or with the family, and games you can only watch.
+  // Games you're in, as yourself or with the family, or where anyone can play, and games you can only watch.
   const inIt = (g: Game) => {
     const seats = Object.values(g.seats);
-    return !seats.length || seats.includes(me.id) || seats.includes('team') || seats.includes('open');
+    return !seats.length || seats.includes(me.id) || seats.includes('team') || seats.includes('open') || g.state?.turn === 'anyone';
   };
   const waiting = playing.filter(inIt);
   const watching = playing.filter((g) => !inIt(g));
@@ -110,7 +110,7 @@ function GameItem({ game: g }: { game: Game }) {
   const def = gameDef(g.type);
   const room = rooms.find((r) => r.id === g.room_id);
   const players = Object.values(g.seats).filter((s): s is number => typeof s === 'number');
-  const press = useLongPress(() => removeGame(g, me, { refreshGames, toast }));
+  const press = useLongPress(() => removeGame(g, me, { rooms, refreshGames, toast }));
   return (
     <li>
       <a className="game-item sheet" href={`#/games/${g.id}`} data-turn={isMyTurn(g, me.id) || undefined} {...press}>
@@ -135,8 +135,17 @@ function GameItem({ game: g }: { game: Game }) {
   );
 }
 
-/** Whether someone may stop a game for everyone: whoever started it, anyone playing in a seat, or an admin. */
-const mayStop = (g: Game, me: Me) => g.created_by_id === me.id || Object.values(g.seats).includes(me.id) || !!me.permissions.manage_people;
+/**
+ * Whether someone may stop a game for everyone: whoever started it, anyone
+ * playing in a seat, or an admin. Once whose turn it is has left the chat,
+ * nobody can play on, so anyone may.
+ */
+function mayStop(g: Game, me: Me, rooms: Room[]): boolean {
+  const turn = g.seats[String(g.state?.turn)];
+  const room = rooms.find((r) => r.id === g.room_id);
+  const gone = typeof turn === 'number' && !!room && !room.member_ids.includes(turn);
+  return g.created_by_id === me.id || Object.values(g.seats).includes(me.id) || !!me.permissions.manage_people || gone;
+}
 
 /**
  * Takes a game off this person's list, asking first. A game still going stops
@@ -145,10 +154,10 @@ const mayStop = (g: Game, me: Me) => g.created_by_id === me.id || Object.values(
 async function removeGame(
   g: Game,
   me: Me,
-  { refreshGames, toast }: { refreshGames: () => Promise<void>; toast: (t: string, tone?: 'success' | 'danger') => void },
+  { rooms, refreshGames, toast }: { rooms: Room[]; refreshGames: () => Promise<void>; toast: (t: string, tone?: 'success' | 'danger') => void },
 ): Promise<boolean> {
   const name = g.title || gameDef(g.type)?.name || 'this game';
-  const stops = g.status === 'active' && mayStop(g, me);
+  const stops = g.status === 'active' && mayStop(g, me, rooms);
   const yes =
     g.status !== 'active'
       ? await confirmFirst(`Take ${name} off your list?`, 'Remove', 'It stays in the chat.')
@@ -202,7 +211,7 @@ function GameView({ id }: { id: number }) {
             {game ? (
               <>
                 <span>{def?.modeLabels?.[game.mode] ?? (Object.values(game.seats).includes('computer') ? 'Against the computer' : game.mode === 'coop' ? 'Together' : 'Against each other')}</span>
-                {room && (
+                {room && !def?.solo && (
                   <>
                     <span aria-hidden="true">·</span>
                     <a href={`#/chats/${room.id}`}>
@@ -233,9 +242,9 @@ function GameView({ id }: { id: number }) {
         {game && (
           <IconButton
             icon="trash"
-            label={game.status === 'active' && mayStop(game, me) ? 'Stop and remove this game' : 'Take this game off your list'}
+            label={game.status === 'active' && mayStop(game, me, rooms) ? 'Stop and remove this game' : 'Take this game off your list'}
             onClick={async () => {
-              if (await removeGame(game, me, { refreshGames, toast })) go({ name: 'games' });
+              if (await removeGame(game, me, { rooms, refreshGames, toast })) go({ name: 'games' });
             }}
           />
         )}
@@ -295,6 +304,7 @@ interface WhoChoice {
 }
 
 function whoChoices(def: GameDef): WhoChoice[] {
+  if (def.solo) return [{ value: 'solo', art: '🙋', label: 'Just me', hint: "Only you play, and it isn't on anyone else's list." }];
   const out: WhoChoice[] = [];
   if (def.modes.includes('coop'))
     out.push(

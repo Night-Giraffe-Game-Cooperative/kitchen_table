@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 
 // Hash routes, so the server only ever serves one page:
-// #/chats, #/chats/3, #/games, #/games/7, #/calendar, #/calendar/month (or tasks, homework, rewards), #/people, #/me, #/call/3
+// #/chats, #/chats/3, #/games, #/games/7, #/learn, #/calendar, #/calendar/month (or tasks, homework, rewards), #/people, #/me, #/call/3
 // and #/calendar/link/5, where Google or Microsoft send someone back to pick an account's calendars.
 export type Route =
   | { name: 'chats'; roomId?: number }
   | { name: 'games'; gameId?: number }
+  | { name: 'learn' }
   | { name: 'calendar'; view?: CalendarView; linkAccount?: number }
   | { name: 'people'; personId?: number }
   | { name: 'outbox' }
@@ -22,6 +23,8 @@ export function parse(hash: string): Route {
   switch (section) {
     case 'games':
       return { name: 'games', gameId: num };
+    case 'learn':
+      return { name: 'learn' };
     case 'calendar':
       if (id === 'link' && Number(more) > 0) return { name: 'calendar', view: 'month', linkAccount: Number(more) };
       return { name: 'calendar', view: id && calendarViews.includes(id) ? (id as CalendarView) : undefined };
@@ -44,6 +47,8 @@ export function href(route: Route): string {
       return route.roomId ? `#/chats/${route.roomId}` : '#/chats';
     case 'games':
       return route.gameId ? `#/games/${route.gameId}` : '#/games';
+    case 'learn':
+      return '#/learn';
     case 'calendar':
       return route.view && route.view !== 'today' ? `#/calendar/${route.view}` : '#/calendar';
     case 'people':

@@ -5,19 +5,7 @@ import { listNames, nameOf, pick } from '../common';
 import { DrawPad } from './DrawPad';
 import { PromptField } from './PromptOptions';
 import { doodleBands, isPrompt, promptsFor, telephoneBasics } from './prompts';
-
-interface Step {
-  kind: 'words' | 'picture';
-  u: number;
-  text?: string;
-  url?: string;
-}
-
-interface State {
-  turn: 'anyone';
-  steps: Step[];
-  length: number;
-}
+import { addStep, canTake, holder, nextKind, release, take, type State, type Step } from './telephone';
 
 interface Options {
   prompt: string;
@@ -39,15 +27,28 @@ function Board({ game, play, me, people }: GameProps<State>) {
   const myLast = last?.u === me.id;
   const canPlay = me.permissions.play_games && !done;
   const left = s.length - s.steps.length;
+  const busyWith = holder(s);
+  const mine = busyWith?.u === me.id;
+  const drawing = nextKind(s) === 'picture';
 
   function add(step: Step) {
     return play.move((st) => {
-      const tip = st.steps[st.steps.length - 1];
-      if (tip?.u === me.id || tip?.kind === step.kind) return null;
-      const next = { ...st, steps: [...st.steps, step] };
+      const next = addStep(st, step);
+      if (!next) return null;
       return next.steps.length >= next.length ? { state: next, status: 'finished', summary: summary(next, people) } : { state: next };
     });
   }
+
+  const takeIt = () =>
+    play.move((st) => {
+      const next = take(st, me.id);
+      return next && { state: next };
+    });
+  const giveBack = () =>
+    play.move((st) => {
+      const next = release(st, me.id);
+      return next && { state: next };
+    });
 
   function sendGuess(e: FormEvent) {
     e.preventDefault();
@@ -85,17 +86,38 @@ function Board({ game, play, me, people }: GameProps<State>) {
       {myLast || !canPlay ? (
         <div className="notice notice-info">
           <p>
-            {myLast
-              ? `You did the last step. Someone else goes next, then you can go again.`
-              : `${nameOf(people, last?.u)} did the last step.`}
+            {myLast && busyWith
+              ? `${nameOf(people, busyWith.u)} is ${drawing ? 'drawing your words' : 'guessing your drawing'}. You can go again after that.`
+              : myLast
+                ? `You did the last step. Someone else goes next, then you can go again.`
+                : `${nameOf(people, last?.u)} did the last step.`}
           </p>
         </div>
-      ) : last?.kind === 'words' ? (
+      ) : busyWith && !mine ? (
+        <div className="notice notice-info" role="status">
+          <p>
+            {nameOf(people, busyWith.u)} is {drawing ? 'drawing' : 'guessing'} the next step. When they pass it on, you can do the one after.
+          </p>
+        </div>
+      ) : !mine ? (
+        <div className="telephone-next sheet">
+          <p className="prompt-banner">{drawing ? '✏️ Next, someone draws the words.' : '🤔 Next, someone guesses the drawing.'}</p>
+          <p className="muted">Only the person who takes it sees what to {drawing ? 'draw' : 'guess'}, and everyone else waits for them.</p>
+          <Button variant="primary" size="lg" busy={play.busy} disabled={!canTake(s, me.id)} onClick={takeIt}>
+            {drawing ? "I'll draw it" : "I'll guess it"}
+          </Button>
+        </div>
+      ) : drawing ? (
         <>
           <p className="prompt-banner">
-            ✏️ Draw this: <strong>{last.text}</strong>
+            ✏️ Draw this: <strong>{last?.text}</strong>
           </p>
-          <DrawPad roomId={game.room_id} label={`Your drawing of ${last.text}`} sendLabel="Pass it on" onSent={(media) => add({ kind: 'picture', u: me.id, url: media.url })} />
+          <DrawPad roomId={game.room_id} label={`Your drawing of ${last?.text}`} sendLabel="Pass it on" onSent={(media) => add({ kind: 'picture', u: me.id, url: media.url })} />
+          <div className="row row-end">
+            <Button variant="ghost" onClick={giveBack}>
+              Let someone else draw it
+            </Button>
+          </div>
         </>
       ) : (
         <form className="stack" onSubmit={sendGuess}>
@@ -105,6 +127,9 @@ function Board({ game, play, me, people }: GameProps<State>) {
           </figure>
           <Field label="Your guess">{(p) => <Input {...p} value={guess} maxLength={80} onChange={(e) => setGuess(e.target.value)} />}</Field>
           <div className="row row-end">
+            <Button variant="ghost" onClick={giveBack}>
+              Let someone else guess
+            </Button>
             <Button type="submit" variant="primary" icon="send" busy={play.busy} disabled={!guess.trim()}>
               Pass it on
             </Button>
@@ -162,7 +187,7 @@ export const doodleTelephone: GameDef<State, Options> = {
     },
     {
       title: 'Taking turns',
-      body: 'Each person only sees the step just before theirs, and nobody does two steps in a row.',
+      body: "Press I'll draw it or I'll guess it to take the next step: everyone else waits while you do it. You only see the step just before yours, and nobody does two steps in a row.",
     },
     {
       title: 'Ideas',
@@ -172,6 +197,8 @@ export const doodleTelephone: GameDef<State, Options> = {
   status: (g, me, people) => {
     if (g.status === 'finished') return g.summary || 'Finished';
     const last = g.state.steps[g.state.steps.length - 1];
+    const busyWith = holder(g.state);
+    if (busyWith) return busyWith.u === me ? `You're ${nextKind(g.state) === 'picture' ? 'drawing' : 'guessing'}` : `${nameOf(people, busyWith.u)} is on the next step`;
     if (last?.u === me) return 'Waiting for someone else';
     return last?.kind === 'words' ? `${nameOf(people, last.u)} needs a drawing` : `${nameOf(people, last?.u)} needs a guess`;
   },

@@ -16,10 +16,12 @@ import {
   hasFinished,
   isSolved,
   newRace,
+  placePiece,
   raceSummary,
   scramble,
   standings,
   swap,
+  waitsOn,
   type RaceState,
 } from './race';
 
@@ -163,15 +165,20 @@ function Grid({
   );
 }
 
-/** Tap a piece, then the place it goes. */
-function useHeld(onSwap: (a: number, b: number) => void) {
-  const [held, setHeld] = useState<number | null>(null);
+/**
+ * Tap a piece, then the place it goes. It holds on to the piece rather than
+ * the space, so when someone else swaps it while it's picked up, it stays
+ * picked up where it went, and drops if they put it in its right place.
+ */
+function useHeld(tiles: number[], onMove: (piece: number, to: number) => void) {
+  const [piece, setPiece] = useState<number | null>(null);
+  const at = piece === null ? -1 : tiles.indexOf(piece);
+  const held = at >= 0 && at !== piece ? at : null;
   function tap(place: number) {
-    if (held === null) return setHeld(place);
-    if (held === place) return setHeld(null);
-    const a = held;
-    setHeld(null);
-    onSwap(a, place);
+    if (held === null) return setPiece(tiles[place]);
+    if (held === place) return setPiece(null);
+    setPiece(null);
+    onMove(piece!, place);
   }
   return { held, tap };
 }
@@ -189,11 +196,10 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
   const tips = usePuzzleTips(band, learn, s.tiles, s.moves, { race: false, peek: clues.peek });
   const smaller = Math.min(6, s.size + 1);
 
-  const { held, tap } = useHeld((a, place) =>
+  const { held, tap } = useHeld(s.tiles, (piece, place) =>
     play.move((st) => {
-      if (st.tiles[a] === a || st.tiles[place] === place) return null;
-      const tiles = [...st.tiles];
-      [tiles[a], tiles[place]] = [tiles[place], tiles[a]];
+      const tiles = placePiece(st.tiles, piece, place);
+      if (!tiles) return null;
       const by = { ...st.by, [me.id]: (st.by[me.id] ?? 0) + 1 };
       const next = { ...st, tiles, moves: st.moves + 1, by };
       if (isSolved(tiles)) {
@@ -292,9 +298,10 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
     return { state: next, status: 'finished', summary: raceSummary(next, seatedOf(g), (k) => nameOf(people, g.seats[k])) };
   }
 
-  const { held, tap } = useHeld((a, b) =>
+  const { held, tap } = useHeld(board?.tiles ?? [], (piece, b) =>
     play.move((st, g) => {
       const seat = seatOf(g.seats, me.id);
+      const a = seat ? (st.boards[seat]?.tiles.indexOf(piece) ?? -1) : -1;
       const next = seat ? swap(st, seat, a, b, Date.now()) : null;
       return next ? settle(next, g) : null;
     }),
@@ -541,4 +548,6 @@ export const picturePuzzle: GameDef<State, Options> = {
     const placed = s.tiles.filter((p, i) => p === i).length;
     return `${placed} of ${s.tiles.length} pieces in place · anyone can help`;
   },
+  // A race has no turns, so this is what puts it under "Your turn" for a player still to start or finish.
+  waitingOn: (g, me) => g.mode === 'versus' && waitsOn(g.state as RaceState, g.seats, me),
 };

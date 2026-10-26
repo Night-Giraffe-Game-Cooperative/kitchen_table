@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useStore } from '../lib/store';
 import { api } from '../lib/api';
 import { permissionText, whoCanChange } from '../lib/permissions';
-import { androidApp, disablePush, enablePush, pushState, testPush, thisDevice, type PushDevice, type PushState } from '../lib/push';
+import { androidApp, appNotifier, disablePush, enablePush, pushState, testPush, thisDevice, type PushDevice, type PushState } from '../lib/push';
 import { ago } from '../lib/time';
 import type { Colour, Me } from '../lib/types';
 import { Avatar, Button, Dialog, Field, Input, Notice, RoleBadge, Segmented, Toggle } from '../components/ui';
@@ -159,11 +159,22 @@ function Notifications() {
   const [mine, setMine] = useState<PushDevice | undefined>();
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
+  const app = appNotifier();
 
   useEffect(() => {
     pushState().then(setState, () => setState('unsupported'));
     api.get<{ devices: PushDevice[] }>('/api/push').then((r) => setDevices(r.devices), () => {});
   }, []);
+
+  // In the Android app, coming back from its settings may have changed things.
+  useEffect(() => {
+    if (!app) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pushState().then(setState, () => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [app]);
 
   useEffect(() => {
     thisDevice(devices).then(setMine, () => setMine(undefined));
@@ -216,7 +227,7 @@ function Notifications() {
       {state === 'unsupported' && androidApp() && (
         <Notice>
           <p>
-            The Kitchen Table app can't show notifications: on Android only Chrome can, for a web app. To get them on this phone or tablet, open Kitchen Table in
+            This version of the Kitchen Table app can't show notifications. The newest one can, so ask whoever set it up to update it. Or open Kitchen Table in
             Chrome, choose <strong>Install app</strong> from Chrome's ⋮ menu, and switch notifications on under Me there.
           </p>
           {androidApp()! >= 1.1 && (
@@ -232,11 +243,23 @@ function Notifications() {
           Table from there and switch them on here.
         </Notice>
       )}
-      {state === 'blocked' && <Notice tone="warning">Notifications are blocked for this site. Allow them in the browser's site settings, then come back here.</Notice>}
+      {state === 'blocked' && !app && <Notice tone="warning">Notifications are blocked for this site. Allow them in the browser's site settings, then come back here.</Notice>}
+      {state === 'blocked' && app && (
+        <Notice tone="warning">
+          <p>Notifications are switched off for Kitchen Table in this device's settings. Allow them there, then come back here.</p>
+          <Button size="sm" onClick={() => app.settings()}>
+            Open settings
+          </Button>
+        </Notice>
+      )}
       {(state === 'on' || state === 'off') && (
         <Toggle
           label="On this device"
-          hint="New messages, calls and your turn in a game pop up while the app is closed. Nothing pops up while you're using it."
+          hint={
+            app
+              ? "New messages, calls and your turn in a game pop up when you're not using the app. It checks every minute or so while it's in the background, and every 15 minutes or so once it's closed."
+              : "New messages, calls and your turn in a game pop up while the app is closed. Nothing pops up while you're using it."
+          }
           checked={state === 'on'}
           onChange={change}
           disabled={busy}

@@ -155,7 +155,7 @@ export function RoomView({ room }: { room: Room }) {
 
   const gamesById = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
   // Games sit above the chat rather than in it, so starting one doesn't fill it up.
-  const going = games.filter((g) => g.room_id === room.id && g.status === 'active');
+  const going = games.filter((g) => g.room_id === room.id && g.status === 'active' && !gameDef(g.type)?.solo);
 
   async function toggleMuted() {
     const muted = !room.muted;

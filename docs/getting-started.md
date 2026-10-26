@@ -201,11 +201,18 @@ The app is `android\build\KitchenTable.apk`, if you'd rather copy it over
 yourself.
 
 Downloads, like a photo saved from a chat, go to the tablet's Downloads
-folder, with a notification when each one is done. The app can't show
-Kitchen Table's own notifications, though: Android only gives those to a
-browser. On a phone, use Chrome instead (open the address, then ⋮, **Install
-app**), and switch notifications on under **Me**. In the Android app, Me says
-so and has a button that opens Kitchen Table in Chrome.
+folder, with a notification when each one is done. Kitchen Table's own
+notifications work in the app too: switch them on under **Me**, and allow
+them when Android asks. With no push service in the app (and no Google),
+it checks for them itself: about every minute while it's open or in the
+background, otherwise every 15 minutes or so, as Android allows.
+
+Learn reads phrases aloud with the tablet's own text-to-speech voices. Most
+tablets come with English only: for Japanese or French, open Settings,
+search for **Text-to-speech**, choose the engine's settings (the cog by
+Google's, usually), then **Install voice data** and the language. The app
+says so the first time it can't find one. Phones and computers use their
+browser's voices, and Learn says when there isn't one for a language.
 
 ## 6. Email
 
@@ -298,12 +305,14 @@ Tapping either opens Today. Change their times or switch them off under Me,
 below Notifications. Kids can switch on their own there too. A day with
 nothing on sends nothing, and quiet hours hold them back until they end.
 
-Notifications need the app online with a proper certificate (see the next
-part). On an iPhone or iPad, add Kitchen Table to the Home Screen first and
-open it from there (iOS 16.4 or later). On Android they need Chrome (or
-another browser), not the Android app from part 5.
+In a browser, notifications need the app online with a proper certificate
+(see the next part). On an iPhone or iPad, add Kitchen Table to the Home
+Screen first and open it from there (iOS 16.4 or later). The Android app
+from part 5 shows them too, at home as well: it checks for them itself,
+about every minute while it's open or in the background, otherwise every 15
+minutes or so, so a call it hears about late shows as a missed call.
 
-They go through each browser's own push service (Google's, Mozilla's,
+In a browser they go through its own push service (Google's, Mozilla's,
 Apple's), the standard Web Push way, so there's nothing to sign up for. Each
 is encrypted for the one device it's going to. `PUSH_CONTACT` sets a
 `mailto:` or `https:` address the push services can reach you at; it's the

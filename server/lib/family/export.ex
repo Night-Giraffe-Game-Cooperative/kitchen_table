@@ -76,7 +76,8 @@ defmodule Family.Export do
       notification_devices:
         Repo.all(from s in Subscription, where: s.user_id == ^user.id, order_by: s.id)
         |> Enum.map(&%{device: &1.device, since: &1.inserted_at, last_used_at: &1.last_used_at}),
-      linked_calendars: Enum.map(links, &link(&1, :own))
+      linked_calendars: Enum.map(links, &link(&1, :own)),
+      holiday_phrases_known: Family.Phrases.keys(user)
     }
 
     events =

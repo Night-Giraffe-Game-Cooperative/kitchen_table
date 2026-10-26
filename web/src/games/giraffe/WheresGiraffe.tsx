@@ -5,6 +5,7 @@
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { confirmFirst } from '../../components/confirm';
 import { Button } from '../../components/ui';
+import { useStore } from '../../lib/store';
 import type { Media } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps } from '../common';
 import { nameOf, startGame } from '../common';
@@ -29,6 +30,7 @@ import {
   nudge,
   placeWords,
   spotAt,
+  waitsFor,
   widthPct,
   type Clue,
   type Spot,
@@ -75,6 +77,7 @@ const symbolOf = (c: Clue | undefined) => (!c ? '' : c.found ? '⭐' : c.heat ==
 const at = (p: Spot): CSSProperties => ({ left: `${p.x * 100}%`, top: `${p.y * 100}%` });
 
 function Board({ game, play, me, people }: GameProps<State>) {
+  const { toast } = useStore();
   const s = game.state;
   const band = bandOf(s);
   const learn = useLearn(TYPE);
@@ -161,6 +164,8 @@ function Board({ game, play, me, people }: GameProps<State>) {
     setAgain(true);
     try {
       await startGame(game, TYPE, { mode: 'coop', seats: { hider: me.id }, state: fresh(s.media, s.band) });
+    } catch (e) {
+      toast((e as Error).message, 'danger');
     } finally {
       setAgain(false);
     }
@@ -439,4 +444,6 @@ export const wheresGiraffe: GameDef<State, Options> = {
     const n = s.guesses?.length ?? 0;
     return `Seeking · ${n ? `${guessesText(n)} so far` : 'no guesses yet'}`;
   },
+  // Seekers have no seat, so this is what puts the game under Your turn for them.
+  waitingOn: (g, me) => waitsFor(g.state, g.seats.hider, me),
 };

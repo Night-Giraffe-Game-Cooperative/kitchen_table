@@ -90,6 +90,13 @@ the tab bar steps aside inside a chat or game to give the keyboard room.
   Sending happens in the background (a `Task.Supervisor`), never holding up
   the message itself. The service worker joins messages from one chat into
   one notification, and tapping one opens the app at that chat, call or game.
+  The Android app's web view has no push service, so `Family.Push.App`
+  stands in for one: the same who-and-when decides, but each notification
+  waits in a table for the app to fetch with its own key (a random one, kept
+  only as a hash), with a newer one on the same topic replacing an older one.
+  The app checks about every minute while it's open or in the background and
+  every 15 minutes or so otherwise (Android's JobScheduler), with no Google
+  in the way.
 
 - **Your things**: `Family.Export` gathers a person's (or, for an admin,
   the family's) data into a zip written by `Family.Zip`, which streams
@@ -536,3 +543,100 @@ finished game stayed on the Games list, which filled it with old rounds
 nobody would open again. Now finished games leave the list unless they made
 something to keep: Doodle Together, Doodle Telephone, Doodle Battle and Story
 Chain. Anyone already looking at a finished game can still see how it ended.
+
+26 Oct 2026. Learn: holiday phrases as a family. A page of its own rather
+than a game, because it's something to come back to before a trip, not a
+round to finish. Japanese and French to start, each with about fifty
+phrases in seven topics, signs to spot, and for Japanese the two kana
+scripts (kanji only as signs, since that's where a visitor meets them).
+Words come with a respelling in English sounds ("ah-ree-gah-toh") rather
+than relying on romaji, which younger readers sound out wrongly. What each
+person knows is kept on the server and shown to their household only, the
+way a family would cheer each other on; it isn't shown to other families.
+The phrase of the day is picked from the date, so everyone at home gets the
+same one to try at tea. Speech uses the device's voices: the browser's
+where there is one, and on the Android app Android's own text-to-speech
+through a small bridge, since its web view has no speech of its own.
+
+26 Oct 2026. Travel in Learn: bullet trains and driving in Japan. Asked for
+road signs and rules of the road for the grown-ups, and bullet train know-how.
+Travel is a Japanese tab with two parts. Bullet trains are for everyone, with
+tips written so a child can follow them. Driving shows only to grown-ups,
+since kids won't drive and the rules would crowd their screen. Road signs are
+drawn in SVG rather than photographed, so they're sharp at any size and need
+no image licences. The road test mixes four sign pictures with six rules and
+needs 9 of 10 to pass, the same 90% the real Japanese written test asks for.
+Passing is saved like a known phrase (ja.test.road, ja.test.trains), so it
+needs nothing new on the server and shows on the family's progress. The
+rules are a starting point, and the page says to read the hire company's
+guide too.
+
+26 Oct 2026. Getting the kids excited: a countdown and Spot it. The holiday
+date is one per household and language, kept in the settings table under
+trip:<family>:<language>, and only grown-ups set it. Kids count in sleeps,
+so the countdown does too, by calendar day rather than hours. The fact of the
+day is picked from the date like the phrase of the day, so the family can
+talk about the same one. Spot it is one shared card rather than a different
+card each, so everyone looks for the same things and the faces on a square
+show who's found it; ticks are saved like known phrases (ja.spot.deer).
+Labels stay short to fit four across on a phone, with where to look listed
+under the card, since tablets can't show a hover hint.
+
+26 Oct 2026. Notifications in the Android app. Asked for by the family: the
+app had none, and Me hid the settings. Android only gives Web Push to a
+browser, and Firebase would mean Google in the middle and an account with
+them, so the app checks for itself. The server keeps what it would have
+pushed in an inbox for each app device, with the same rules as Web Push
+(who's using the app, quiet hours, muted chats, a newer one on the same
+topic replacing the older, too-old ones dropped), and the app fetches it
+with a key of its own rather than the sign-in cookie, since it checks long
+after the page has gone. It checks about every minute while it's open or in
+the background, otherwise every 15 minutes or so, as Android allows, and
+straight away when news reaches its page while it's still connected; a call
+it only hears about later shows as missed. Me has the same switches
+as in a browser, and tapping a notification opens the app at that chat,
+call or game. It works at home with the home-made certificate too, since
+the app already trusts that one.
+
+26 Oct 2026. Games played at the same moment. Doodle Telephone locked when
+two people drew the same words: whoever sent second lost their drawing. Now
+one person takes each step and the others see who's on it. Checking every
+other game the same way found smaller cases: a move worked out for a board
+that has since changed is refused rather than replayed on the new one, a
+picture finished just after the pictures were shown joins them, Play again
+leaves out anyone who has left the chat, and games that wait on people
+without a seat (stars, races, seekers) show under Your turn. Anyone in the
+chat may stop a game whose turn belongs to someone who has left it, since
+nobody else can move.
+
+26 Oct 2026. Bonsai, a game for one. Asked for as a calm, ongoing game with a
+watercolour look. It's a tree to look after rather than something to win,
+so it never dies: a thirsty tree stops growing and droops, and a drink
+brings it back. Everything that happens while nobody looks (the soil drying,
+new shoots, autumn leaves) is worked out from the date and the tree's seed,
+so it needs no timer on the server and comes out the same each time it's
+opened; only what the gardener does is saved. It follows the real UK
+seasons, so a maple sleeps bare in winter and a cherry blossoms in spring.
+Trimming a shoot makes that pad bushier, and a shoot left alone becomes a
+branch, so how it's looked after shapes the tree. Days of looking after it,
+not streaks, unlock pots and things to put by it, and Going away hands it to
+someone kind for holidays. A solo game is its own kind: no choosing who
+plays, nobody else's list, not in the chat, and not put away after two
+quiet days like other games. The painting is SVG: soft shapes through a
+wobble, grain and darker-edge filter, layered so overlaps deepen like real
+paint, on cream paper that stays cream in dark mode.
+
+26 Oct 2026. Sushi Train, a game everyone plays at once. Asked for as a
+co-op conveyor belt game with orders that grow more complicated. Nobody
+takes turns: each person has their own station on their own screen and
+sends plates whenever they're ready, and a plate goes to the first customer
+still waiting for exactly that, so two people making the same dish never
+lose one; the second goes round the belt until someone orders it. What's on
+each chopping board stays on that device, and only a sent plate is a move.
+Orders come from the game's seed, wave and seat, so everyone sees the same
+customers, and the next wave sits down once everyone's eaten. Making a dish
+is a few big taps with pictures (rice, then a topping; seaweed, rice,
+fillings, then Roll it), and up to 13 the next thing to tap glows, so the
+youngest can follow the glow while older players race. Stars go by how long
+a wave took for its number of dishes, never by mistakes, and a wrong dish
+just goes round the belt.

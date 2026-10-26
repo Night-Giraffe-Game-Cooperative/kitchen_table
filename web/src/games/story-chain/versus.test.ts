@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addLine, bestLines, canStar, everyoneStarred, markDone, newStory, standings, starWinners, storySummary, toggleStar, totals, type StoryVersus } from './versus';
+import { addLine, bestLines, canStar, everyoneStarred, markDone, newStory, standings, starWinners, storySummary, toggleStar, totals, waitsOn, type StoryVersus } from './versus';
 
 const order = ['p1', 'p2'];
 const ids: Record<string, number> = { p1: 1, p2: 2 };
@@ -94,5 +94,16 @@ describe('Story Chain versus', () => {
     expect(everyoneStarred(s, [1, 2])).toBe(false);
     s = markDone(s, 2)!;
     expect(everyoneStarred(s, [1, 2])).toBe(true);
+  });
+
+  it('waits on the writer, then on every player still to give stars', () => {
+    const seats = { p1: 1, p2: 2 };
+    let s = written(['a']);
+    expect([1, 2, 3].map((id) => waitsOn(s, seats, id))).toEqual([false, true, false]);
+    s = written(['a', 'b', 'c', 'd']);
+    // Stars time has no turn, but both players still owe their stars; Gran is only reading.
+    expect([1, 2, 3].map((id) => waitsOn(s, seats, id))).toEqual([true, true, false]);
+    s = markDone(s, 1)!;
+    expect([1, 2].map((id) => waitsOn(s, seats, id))).toEqual([false, true]);
   });
 });

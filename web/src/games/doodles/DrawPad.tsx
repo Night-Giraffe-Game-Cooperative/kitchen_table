@@ -9,7 +9,7 @@ import { Button } from '../../components/ui';
 
 const PAGE = 700;
 
-/** A private page: draw, then send the finished picture as a photo in the room. */
+/** A private page: draw, then send the finished picture as a photo in the room. If the move doesn't go through (onSent gives false), the drawing stays. */
 export function DrawPad({ roomId, label, sendLabel, onSent }: { roomId: number; label: string; sendLabel: string; onSent: (m: Media) => Promise<unknown> }) {
   const { toast } = useStore();
   const [items, setItems] = useState<Item[]>([]);
@@ -23,8 +23,7 @@ export function DrawPad({ roomId, label, sendLabel, onSent }: { roomId: number; 
       const canvas = renderPicture(items, PAGE, null, 1200);
       const blob = await toBlob(canvas, 'image/png');
       const { media } = await upload(roomId, { blob, width: canvas.width, height: canvas.height });
-      await onSent(media);
-      setItems([]);
+      if ((await onSent(media)) !== false) setItems([]);
     } catch (e) {
       toast((e as Error).message, 'danger');
     } finally {

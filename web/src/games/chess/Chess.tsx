@@ -6,22 +6,8 @@ import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, Update } from '../common';
 import { nameOf } from '../common';
 import { chooseMove, type Level } from './ai';
-import {
-  START_FEN,
-  captured,
-  inCheck,
-  kingSquare,
-  makeMove,
-  movesFrom,
-  outcome,
-  parseFen,
-  san,
-  squareName,
-  toFen,
-  type Kind,
-  type Move,
-  type Side,
-} from './rules';
+import { START_FEN, captured, inCheck, kingSquare, movesFrom, parseFen, squareName, type Kind, type Move, type Outcome, type Side } from './rules';
+import { play, playTurn, seatOf, strengthOf, takeBackTo, type ChessState, type Seat } from './turns';
 import { PieceIcon, pieceName } from './Pieces';
 import { HINT, TipNote, useLearn, useTips } from '../learn';
 import { PROMOTE_TIP, chessBasics, chessGuide, endTip, explainMove, pieceTips, riskOf, theirMoveTip, turnTips } from './learn';
@@ -29,20 +15,7 @@ import { bandOf, type Band } from '../bands';
 import { confirmFirst } from '../../components/confirm';
 import type { Who } from '../opponents';
 
-type Seat = 'white' | 'black';
-
-interface State {
-  turn: Seat;
-  fen: string;
-  history: string[]; // positions before each move, for repetition and taking back
-  moves: string[];
-  last: [number, number] | null;
-  /** Kept at 3 or below, as older copies of the app only know three levels. */
-  level?: Level;
-  /** The computer's real strength, 4 for 14 and up. */
-  strength?: Level;
-  ended?: string;
-}
+type State = ChessState;
 
 interface Options {
   side: 'white' | 'black' | 'random';
@@ -51,31 +24,12 @@ interface Options {
   who: Who;
 }
 
-const seatOf = (s: Side): Seat => (s === 'w' ? 'white' : 'black');
 const sideOf = (s: Seat): Side => (s === 'white' ? 'w' : 'b');
 const levels: Record<Level, string> = { 1: 'Gentle', 2: 'Steady', 3: 'Tricky', 4: 'Strong' };
 /** How well the computer plays for each age band. */
 const levelFor: Record<Band, Level> = { '5-7': 1, '8-10': 2, '11-13': 3, '14+': 4 };
-const strengthOf = (s: State): Level => s.strength ?? s.level ?? 2;
 
-/** Plays one move and reports whether that ended the game. */
-function play(state: State, move: Move): { state: State; over: ReturnType<typeof outcome> } {
-  const pos = parseFen(state.fen);
-  const text = san(pos, move);
-  const next = makeMove(pos, move);
-  const history = [...state.history, state.fen];
-  const out: State = {
-    ...state,
-    fen: toFen(next),
-    turn: seatOf(next.turn),
-    history,
-    moves: [...state.moves, text],
-    last: [move.from, move.to],
-  };
-  return { state: out, over: outcome(next, history) };
-}
-
-function describeEnd(over: NonNullable<ReturnType<typeof outcome>>, game: Game<State>, people: GameProps<State>['people']): string {
+function describeEnd(over: NonNullable<Outcome>, game: Game<State>, people: GameProps<State>['people']): string {
   if (over.kind === 'checkmate') {
     const who = game.seats[seatOf(over.winner)];
     if (who === 'team') return 'Checkmate! The family beat the computer at chess 🎉';
@@ -117,6 +71,13 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
   const learn = useLearn('chess');
   const tips = useTips('chess', { band, learn });
 
+  // Someone else's move changes the board under a piece picked up here, so put it down.
+  useEffect(() => {
+    setSelected(null);
+    setPromoting(null);
+    setHint(null);
+  }, [s.fen]);
+
   // At the start of each turn: check, and anything unusual the other side just did. In learn mode, whatever they did.
   useEffect(() => {
     if (done) return void tips.offer(endTip(s.ended));
@@ -142,23 +103,18 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
     setHint(null);
     tips.dismiss();
     // Show the move straight away, then let the computer think.
+    const seen = s.fen;
     const mine = play(s, move);
     setPreview({ fen: mine.state.fen, last: [move.from, move.to] });
     if (coop && !mine.over) setThinking(true);
     await new Promise((r) => setTimeout(r, 60));
 
     const ok = await actions.move((st, g): Update<State> | null => {
-      const p = parseFen(st.fen);
-      if (seatOf(p.turn) !== st.turn || !movesFrom(p, move.from).some((m) => m.to === move.to && m.promotion === move.promotion)) return null;
-      let step = play(st, move);
+      // If someone else moved first, this move was chosen for a different position.
+      const computer = coop ? (Object.keys(g.seats) as Seat[]).find((k) => g.seats[k] === 'computer') : undefined;
+      const step = playTurn(st, seen, move, computer);
+      if (!step) return null;
       if (step.over) return { state: { ...step.state, ended: step.over.kind }, status: 'finished', summary: describeEnd(step.over, g, people) };
-      if (coop && g.seats[step.state.turn] === 'computer') {
-        const reply = chooseMove(parseFen(step.state.fen), strengthOf(st), undefined, [...step.state.history, step.state.fen]);
-        if (reply) {
-          step = play(step.state, reply);
-          if (step.over) return { state: { ...step.state, ended: step.over.kind }, status: 'finished', summary: describeEnd(step.over, g, people) };
-        }
-      }
       return { state: step.state };
     });
     setThinking(false);
@@ -187,16 +143,12 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
   }
 
   async function takeBack() {
+    const seen = s.fen;
     await actions.move((st, g) => {
-      const fam = (Object.keys(g.seats) as Seat[]).find((k) => g.seats[k] !== 'computer');
-      let next = st;
       // Go back to the family's last turn, removing the computer's reply too.
-      do {
-        if (!next.history.length) break;
-        const fen = next.history[next.history.length - 1];
-        next = { ...next, fen, turn: seatOf(parseFen(fen).turn), history: next.history.slice(0, -1), moves: next.moves.slice(0, -1), last: null };
-      } while (next.turn !== fam);
-      return next.turn === fam && next.fen !== st.fen ? { state: next } : null;
+      const fam = (Object.keys(g.seats) as Seat[]).find((k) => g.seats[k] !== 'computer');
+      const back = fam && takeBackTo(st, seen, fam);
+      return back ? { state: back } : null;
     });
   }
 
@@ -337,7 +289,8 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
               Take back
             </Button>
           )}
-          {(myTurn || mySeat) && (
+          {/* The server takes a move only from whoever's turn it is; the bin above the board removes a game at any time. */}
+          {myTurn && (
             <Button
               size="sm"
               variant="ghost"

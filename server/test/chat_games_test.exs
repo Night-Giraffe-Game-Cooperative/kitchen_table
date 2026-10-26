@@ -172,6 +172,40 @@ defmodule Family.ChatGamesTest do
     assert family.id in theirs
   end
 
+  test "a bonsai is its gardener's alone, and isn't put away while nobody looks", %{kid: kid, grownup: grownup, room: room} do
+    {:ok, tree} = Games.create(kid, room.id, %{"type" => "bonsai", "mode" => "coop", "seats" => %{"gardener" => kid.id}, "state" => %{"turn" => "gardener"}})
+    assert tree.id in (kid |> Games.list_for() |> Enum.map(& &1.id))
+    refute tree.id in (grownup |> Games.list_for() |> Enum.map(& &1.id))
+    assert {:error, "It isn't your turn."} = Games.move(grownup, tree.id, %{"version" => 0, "state" => %{"turn" => "gardener"}})
+    # A game with one person in a seat but everyone playing, like hiding the Night Giraffe, is on everyone's list.
+    {:ok, hide} = Games.create(kid, room.id, %{"type" => "wheres_giraffe", "mode" => "coop", "seats" => %{"hider" => kid.id}, "state" => %{"turn" => "anyone"}})
+    assert hide.id in (grownup |> Games.list_for() |> Enum.map(& &1.id))
+
+    # A month away doesn't put it away.
+    now = DateTime.utc_now(:second)
+    Repo.update_all(from(g in Games.Game, where: g.id == ^tree.id), set: [updated_at: DateTime.add(now, -30 * 86_400)])
+    assert Games.finish_idle(now) == 0
+    assert {:ok, %{version: 1}} = Games.move(kid, tree.id, %{"version" => 0, "state" => %{"turn" => "gardener"}})
+  end
+
+  test "anyone may stop a game whose turn belongs to someone who has left the chat", %{admin: admin, kid: kid, grownup: grownup} do
+    kim = person_fixture(admin, "grownup", "Kim")
+    {:ok, room} = Chat.create_room(admin, %{"name" => "Games club", "member_ids" => [kid.id, grownup.id, kim.id]})
+    chess = %{"type" => "chess", "mode" => "versus", "seats" => %{"w" => kid.id, "b" => grownup.id}, "state" => %{"turn" => "b"}}
+    {:ok, first} = Games.create(kid, room.id, chess)
+    {:ok, game} = Games.create(kid, room.id, chess)
+
+    # While Jo is here, Kim isn't playing, so it only leaves Kim's list.
+    assert {:ok, false} = Games.remove(kim, first.id)
+    # Jo leaves on Jo's turn: nobody can play on, so Kim may stop it.
+    {:ok, _} = Chat.update_room(admin, room, %{"member_ids" => [kid.id, kim.id]})
+    assert {:ok, true} = Games.remove(kim, game.id)
+    assert %{status: "finished", state: %{"ended" => "stopped"}} = Games.get(game.id)
+
+    # A move sent just as a game ends is someone else moving first.
+    assert {:error, :conflict} = Games.move(kid, game.id, %{"version" => 0, "state" => %{"turn" => "b"}})
+  end
+
   test "co-op games let anyone on the team move, and doodles append strokes", %{kid: kid, grownup: grownup, room: room} do
     {:ok, game} =
       Games.create(kid, room.id, %{

@@ -13,6 +13,7 @@ import {
   layoutFor,
   missShowing,
   newGame,
+  nextPlayers,
   pairsFound,
   rating,
   ratingText,
@@ -274,5 +275,18 @@ describe('taking turns', () => {
     const mia = turn(table([0, 0, 1, 1], order), [0, 2], as('p1', 7));
     const miaLeads = turn(mia, [0, 1], as('p2', 9));
     expect(scoreLine(miaLeads, order, (k) => (k === 'p2' ? 'Mia' : 'Dad'))).toBe('Mia leads with 1 pair');
+  });
+});
+
+describe('playing again', () => {
+  it('keeps the same players, with the next one starting', () => {
+    expect(nextPlayers([7, 9, 11])).toEqual([9, 11, 7]);
+    expect(nextPlayers([7, 9], [7, 9, 11])).toEqual([9, 7]);
+  });
+
+  it("leaves out anyone who has left the chat, so the server doesn't refuse the next game", () => {
+    expect(nextPlayers([7, 9, 11], [7, 11])).toEqual([11, 7]);
+    // Down to one player: a place for someone to join.
+    expect(nextPlayers([7, 9], [7])).toEqual([7, 'open']);
   });
 });

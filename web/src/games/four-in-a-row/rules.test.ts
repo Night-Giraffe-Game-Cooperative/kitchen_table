@@ -15,6 +15,8 @@ import {
   outcome,
   outcomeOf,
   playColumn,
+  sameMoves,
+  takeBackTo,
   turnOf,
   winningColumns,
   type Disc,
@@ -236,5 +238,37 @@ describe('looking ahead', () => {
     expect(bestLine(grid, 2, 0, 'red')).toBe(2);
     expect(bestLine(grid, 6, 2, 'yellow')).toBe(2);
     expect(bestLine(grid, 5, 4, 'red')).toBe(0);
+  });
+});
+
+describe('taking back', () => {
+  it("goes back to the family's last turn, taking the computer's reply too", () => {
+    const moves = playAll([3, 4, 2, 5]);
+    expect(takeBackTo(moves, moves, 'red')).toEqual([3, 4]);
+    // The family plays yellow after the computer opened as red.
+    const second = playAll([3, 4, 2]);
+    expect(takeBackTo(second, second, 'yellow')).toEqual([3]);
+  });
+
+  it('has nothing to take back before the family has had a turn', () => {
+    expect(takeBackTo([], [], 'red')).toBeNull();
+    expect(takeBackTo([3], [3], 'yellow')).toBeNull();
+  });
+
+  it("refuses when someone has moved since it was pressed, so it doesn't undo their move", () => {
+    const seen = playAll([3, 4]);
+    // Dad dropped a counter and the computer replied before Mum's take back arrived.
+    const now = playAll([3, 4, 2, 5]);
+    expect(takeBackTo(now, seen, 'red')).toBeNull();
+    // Two presses at once: the second lands on the board the first already took back.
+    const once = takeBackTo(now, now, 'red')!;
+    expect(takeBackTo(once, now, 'red')).toBeNull();
+  });
+
+  it('tells a board apart from one with as many counters after a take back', () => {
+    expect(sameMoves([3, 4, 2, 5], [3, 4, 2, 5])).toBe(true);
+    // Taken back to [3, 4], then a counter in 1 and the reply: still four moves, but a different board.
+    expect(sameMoves([3, 4, 1, 5], [3, 4, 2, 5])).toBe(false);
+    expect(sameMoves([3, 4], [3, 4, 2])).toBe(false);
   });
 });

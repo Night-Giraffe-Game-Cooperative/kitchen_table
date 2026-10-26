@@ -5,6 +5,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Avatar, Button } from '../../components/ui';
 import { confirmFirst } from '../../components/confirm';
+import { useStore } from '../../lib/store';
 import type { Game, Person, Seat } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { nameOf, nextSeat, placings, playerSeats, seatOrder, startGame } from '../common';
@@ -116,6 +117,7 @@ const TIPS = {
 } satisfies Record<string, Tip>;
 
 function Board({ game, play, me, people }: GameProps<State>) {
+  const { toast } = useStore();
   const s = game.state;
   const n = s.size;
   const seats = game.seats;
@@ -278,6 +280,9 @@ function Board({ game, play, me, people }: GameProps<State>) {
       }
       const state = newBoard(n, { ...(s.level ? { level: s.level } : {}), ...(s.band ? { band: s.band } : {}) });
       await startGame(game, TYPE, { mode: game.mode, seats: next, state, ...(game.title ? { title: game.title } : {}) });
+    } catch (e) {
+      // Such as someone in the last round having left the chat since.
+      toast((e as Error).message, 'danger');
     } finally {
       setAgain(false);
     }

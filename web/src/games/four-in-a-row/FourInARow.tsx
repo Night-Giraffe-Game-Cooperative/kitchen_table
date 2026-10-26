@@ -28,6 +28,8 @@ import {
   other,
   outcome,
   playColumn,
+  sameMoves,
+  takeBackTo,
   turnOf,
   winningColumns,
   type Disc,
@@ -147,7 +149,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
   async function drop(col: number) {
     if (!canPlay) return;
     if (!canDrop(grid, col)) return void tips.show(TIPS.full);
-    const seen = s.moves.length;
+    const seen = s.moves;
     const mine = playColumn(s.moves, col);
     if (!mine) return;
     setHint(null);
@@ -161,7 +163,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
 
     const ok = await play.move((st, g): Update<State> | null => {
       // Moves are retried on the newest game: if another counter has gone in since, this one was meant for a different board.
-      if (g.status !== 'active' || st.moves.length !== seen || (g.seats[st.turn] !== 'team' && g.seats[st.turn] !== me.id)) return null;
+      if (g.status !== 'active' || !sameMoves(st.moves, seen) || (g.seats[st.turn] !== 'team' && g.seats[st.turn] !== me.id)) return null;
       let step = advance(st, col);
       if (!step) return null;
       if (!step.over && g.mode === 'coop' && g.seats[step.state.turn] === 'computer') {
@@ -197,15 +199,13 @@ function Board({ game, play, me, people }: GameProps<State>) {
   async function takeBack() {
     setHint(null);
     tips.dismiss();
+    const seen = s.moves;
     await play.move((st, g) => {
       const family = DISCS.find((d) => g.seats[d] !== 'computer');
       if (!family || g.status !== 'active') return null;
-      // Back to the family's last turn, taking the computer's reply away too.
-      let back = st.moves;
-      do back = back.slice(0, -1);
-      while (back.length && turnOf(back) !== family);
-      if (turnOf(back) !== family || back.length === st.moves.length) return null;
-      return { state: { ...st, moves: back, turn: family } };
+      // Back to the family's last turn, taking the computer's reply away too, on the board take back was pressed on.
+      const back = takeBackTo(st.moves, seen, family);
+      return back ? { state: { ...st, moves: back, turn: family } } : null;
     });
   }
 

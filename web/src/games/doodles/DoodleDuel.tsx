@@ -6,21 +6,7 @@ import { listNames, nameOf, pick } from '../common';
 import { DrawPad } from './DrawPad';
 import { PromptField } from './PromptOptions';
 import { doodleBands, duelBasics, isPrompt, promptsFor } from './prompts';
-
-interface State {
-  turn: 'anyone';
-  prompt: string;
-  phase: 'drawing' | 'voting' | 'done';
-  players: number[];
-  entries: Record<string, string>; // person id -> picture url
-  votes: Record<string, number>; // voter id -> person whose picture they chose
-}
-
-function tally(s: State) {
-  const counts = new Map<number, number>();
-  for (const id of Object.values(s.votes)) counts.set(id, (counts.get(id) ?? 0) + 1);
-  return counts;
-}
+import { addEntry, allVoted, canCount, showNow, tally, vote, waitsOn, type DuelState as State } from './duel';
 
 function finish(s: State, people: GameProps<State>['people']) {
   const counts = tally(s);
@@ -42,13 +28,18 @@ function Board({ game, play, me, people }: GameProps<State>) {
   const canPlay = me.permissions.play_games && game.status === 'active';
   const counts = tally(s);
   const top = Math.max(0, ...counts.values());
+  const drawing = s.phase === 'drawing';
+  // The page stays in the same place when the pictures are shown early, so a
+  // drawing still being made isn't lost, and it can be added late.
+  const drawer = canPlay && s.phase !== 'done' && !mine && (s.players.includes(me.id) || showPad);
 
-  if (s.phase === 'drawing') {
-    return (
-      <div className="doodle-game">
-        <p className="prompt-banner">
-          ✏️ Everyone draws: <strong>{s.prompt}</strong>
-        </p>
+  return (
+    <div className="doodle-game">
+      <p className="prompt-banner">
+        {drawing ? '✏️ Everyone draws: ' : s.phase === 'voting' ? '🌟 Give a star to your favourite: ' : '🖼️ '}
+        <strong>{s.prompt}</strong>
+      </p>
+      {drawing ? (
         <div className="artists">
           {s.players.map((id) => (
             <span key={id} className="artist" data-done={!!s.entries[id] || undefined}>
@@ -59,87 +50,85 @@ function Board({ game, play, me, people }: GameProps<State>) {
             </span>
           ))}
         </div>
-        {canPlay && !mine && (s.players.includes(me.id) || showPad) && (
-          <DrawPad
-            roomId={game.room_id}
-            label={`Your drawing of ${s.prompt}`}
-            sendLabel="I'm done"
-            onSent={(media) =>
-              play.move((st) => {
-                const entries: Record<string, string> = { ...st.entries, [me.id]: media.url };
-                const players = st.players.includes(me.id) ? st.players : [...st.players, me.id];
-                const everyone = players.every((id) => entries[id]);
-                return { state: { ...st, entries, players, phase: everyone ? 'voting' : 'drawing' } };
-              })
-            }
-          />
-        )}
-        {canPlay && !mine && !s.players.includes(me.id) && !showPad && (
-          <Button variant="primary" icon="brush" onClick={() => setShowPad(true)}>
-            Join in and draw
-          </Button>
-        )}
-        {mine && (
-          <div className="notice notice-info">
-            <p>
-              Your picture is in! {waiting.length ? `Waiting for ${listNames(waiting.map((id) => nameOf(people, id)))}.` : ''} The pictures are shown
-              when everyone's done.
-            </p>
-            {canPlay && entrants.length >= 2 && waiting.length > 0 && (
-              <Button size="sm" onClick={() => play.move((st) => ({ state: { ...st, phase: 'voting' } }))}>
-                Show the pictures now
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="doodle-game">
-      <p className="prompt-banner">
-        {s.phase === 'voting' ? '🌟 Give a star to your favourite: ' : '🖼️ '}
-        <strong>{s.prompt}</strong>
-      </p>
-      <ul className="gallery">
-        {entrants.map((id) => {
-          const n = counts.get(id) ?? 0;
-          const winner = s.phase === 'done' && n === top && n > 0;
-          return (
-            <li key={id} className="gallery-item sheet" data-winner={winner || undefined}>
-              <img src={s.entries[id]} alt={`${nameOf(people, id)}'s drawing of ${s.prompt}`} />
-              <div className="gallery-foot">
-                <Avatar person={people.get(id)} size="xs" />
-                <span>{nameOf(people, id, me.id)}</span>
-                {(s.phase === 'done' || myVote) && n > 0 && <span className="stars">{'🌟'.repeat(n)}</span>}
-                {winner && <span aria-label="Most stars">👑</span>}
-              </div>
-              {s.phase === 'voting' && canPlay && id !== me.id && (
-                <Button
-                  size="sm"
-                  variant={myVote === id ? 'primary' : 'secondary'}
-                  icon="star"
-                  disabled={play.busy}
-                  onClick={() =>
-                    play.move((st) => {
-                      const votes: Record<string, number> = { ...st.votes, [me.id]: id };
-                      const next = { ...st, votes };
-                      const allVoted = Object.keys(next.entries).every((voter) => votes[voter]);
-                      return allVoted ? finish(next, people) : { state: next };
-                    })
-                  }
-                >
-                  {myVote === id ? 'Your star' : 'Give a star'}
-                </Button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {s.phase === 'voting' && canPlay && Object.keys(s.votes).length > 0 && (
+      ) : (
+        <ul className="gallery">
+          {entrants.map((id) => {
+            const n = counts.get(id) ?? 0;
+            const winner = s.phase === 'done' && n === top && n > 0;
+            return (
+              <li key={id} className="gallery-item sheet" data-winner={winner || undefined}>
+                <img src={s.entries[id]} alt={`${nameOf(people, id)}'s drawing of ${s.prompt}`} />
+                <div className="gallery-foot">
+                  <Avatar person={people.get(id)} size="xs" />
+                  <span>{nameOf(people, id, me.id)}</span>
+                  {(s.phase === 'done' || myVote) && n > 0 && <span className="stars">{'🌟'.repeat(n)}</span>}
+                  {winner && <span aria-label="Most stars">👑</span>}
+                </div>
+                {s.phase === 'voting' && canPlay && id !== me.id && (
+                  <Button
+                    size="sm"
+                    variant={myVote === id ? 'primary' : 'secondary'}
+                    icon="star"
+                    disabled={play.busy}
+                    onClick={() =>
+                      play.move((st) => {
+                        const next = vote(st, me.id, id);
+                        if (!next) return null;
+                        return allVoted(next) ? finish(next, people) : { state: next };
+                      })
+                    }
+                  >
+                    {myVote === id ? 'Your star' : 'Give a star'}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {!drawing && drawer && <p className="muted">The pictures are out, but there's still time to finish yours and add it.</p>}
+      {drawer && (
+        <DrawPad
+          roomId={game.room_id}
+          label={`Your drawing of ${s.prompt}`}
+          sendLabel={drawing ? "I'm done" : 'Add mine'}
+          onSent={(media) =>
+            play.move((st) => {
+              const next = addEntry(st, me.id, media.url);
+              return next && { state: next };
+            })
+          }
+        />
+      )}
+      {drawing && canPlay && !mine && !s.players.includes(me.id) && !showPad && (
+        <Button variant="primary" icon="brush" onClick={() => setShowPad(true)}>
+          Join in and draw
+        </Button>
+      )}
+      {drawing && mine && (
+        <div className="notice notice-info">
+          <p>
+            Your picture is in! {waiting.length ? `Waiting for ${listNames(waiting.map((id) => nameOf(people, id)))}.` : ''} The pictures are shown
+            when everyone's done.
+          </p>
+          {canPlay && entrants.length >= 2 && waiting.length > 0 && (
+            <Button
+              size="sm"
+              onClick={() =>
+                play.move((st) => {
+                  const next = showNow(st);
+                  return next && { state: next };
+                })
+              }
+            >
+              Show the pictures now
+            </Button>
+          )}
+        </div>
+      )}
+      {canPlay && canCount(s) && (
         <div className="row row-end">
-          <Button onClick={() => play.move((st) => finish(st, people))}>Count the stars now</Button>
+          <Button onClick={() => play.move((st) => (st.phase === 'voting' ? finish(st, people) : null))}>Count the stars now</Button>
         </div>
       )}
     </div>
@@ -171,7 +160,8 @@ export const doodleDuel: GameDef<State, { prompt: string }> = {
       turn: 'anyone',
       prompt: o.prompt.trim(),
       phase: 'drawing',
-      players: room.member_ids.filter((id) => people.get(id)?.active !== false),
+      // Not anyone whose games are switched off: the pictures would wait for them for ever.
+      players: room.member_ids.filter((id) => people.get(id)?.active !== false && people.get(id)?.permissions?.play_games !== false),
       entries: {},
       votes: {},
     },
@@ -195,4 +185,6 @@ export const doodleDuel: GameDef<State, { prompt: string }> = {
     const waiting = s.players.filter((id) => !s.entries[id]);
     return `Waiting for ${listNames(waiting.map((id) => nameOf(people, id)))}`;
   },
+  // Nobody has a turn, so this is what puts it under "Your turn" for whoever is still to draw or give a star.
+  waitingOn: (g, me) => waitsOn(g.state, me),
 };

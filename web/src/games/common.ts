@@ -69,6 +69,8 @@ export interface GameDef<S = any, O = any> {
    * options' `who` says which ('me' or 'team').
    */
   against?: string;
+  /** Only ever one person's, like a bonsai to look after: no choosing who plays, and it stays out of the chat. */
+  solo?: boolean;
   /** Most players against each other, you included. Their ids come in the options' `players`, and the first in `opponent`. */
   most?: number;
   defaults: (ctx: { me: Me; room: Room; mode: Mode; band: Band }) => O;

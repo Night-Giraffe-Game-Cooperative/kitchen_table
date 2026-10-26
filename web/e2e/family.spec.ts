@@ -5,6 +5,7 @@ import { startFakeCaldav } from './fixtures/fakeCaldav';
 import { googleClient, microsoftClient, startFakeConnect } from './fixtures/fakeConnect';
 import { startFakePush } from './fixtures/fakePush';
 import { spills, type Spill } from './fixtures/spills';
+import { roadRules, roadSigns, trainQuestions } from '../src/learn/japanTravel';
 
 // One family, start to finish: the first admin sets up, adds a kid and a
 // grown-up, they sign in with one-time passwords, chat, share and doodle on a
@@ -243,6 +244,35 @@ test('Doodle Together, live on two screens', async () => {
   await expect(admin.locator('.finished-picture img')).toBeVisible();
 });
 
+test('Doodle Telephone: one person takes each step, and the others wait', async () => {
+  await admin.getByRole('link', { name: /^Games\b/ }).click();
+  await admin.getByRole('button', { name: 'New game' }).click();
+  await admin.getByRole('button', { name: /Doodle Telephone/ }).click();
+  const dialog = admin.getByRole('dialog');
+  await dialog.getByLabel('The first words').fill('a cat on a bus');
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(admin.locator('.doodle-game')).toContainText('You did the last step');
+
+  // Mia takes the drawing. Until then the words stay hidden.
+  await kid.goto('/#/games');
+  await kid.getByRole('link', { name: /Doodle Telephone/ }).click();
+  await expect(kid.locator('.telephone-next')).toContainText('Next, someone draws the words.');
+  await expect(kid.locator('.doodle-game')).not.toContainText('a cat on a bus');
+  await kid.getByRole('button', { name: "I'll draw it" }).click();
+  await expect(kid.locator('.prompt-banner')).toContainText('a cat on a bus');
+  await expect(admin.locator('.doodle-game')).toContainText('Mia is drawing your words');
+  await draw(kid, '.board-canvas', [[0.3, 0.5], [0.5, 0.3], [0.7, 0.5]]);
+  await kid.getByRole('button', { name: 'Pass it on' }).click();
+  await expect(kid.locator('.doodle-game')).toContainText('You did the last step');
+
+  // Alex guesses it, and it's Mia's turn to take the next drawing.
+  await admin.getByRole('button', { name: "I'll guess it" }).click();
+  await admin.getByLabel('Your guess').fill('a cat on a bus');
+  await admin.getByRole('button', { name: 'Pass it on' }).click();
+  await expect(kid.getByRole('button', { name: "I'll draw it" })).toBeVisible();
+  await shot(kid, '16b-phone-doodle-telephone');
+});
+
 test('Backgammon: just me against the computer', async () => {
   await admin.getByRole('link', { name: /^Games\b/ }).click();
   await admin.getByRole('button', { name: 'New game' }).click();
@@ -271,6 +301,99 @@ test('Backgammon: just me against the computer', async () => {
   await kid.goto('/#/games');
   await expect(kid.locator('.game-item').first()).toBeVisible();
   await expect(kid.locator('.game-item', { hasText: 'Backgammon' })).toHaveCount(0);
+});
+
+test('Bonsai: a little tree of your own, looked after a bit each day', async () => {
+  await admin.getByRole('link', { name: /^Games\b/ }).click();
+  await admin.getByRole('button', { name: 'New game' }).click();
+  const dialog = admin.getByRole('dialog');
+  await dialog.getByRole('button', { name: /^Bonsai/ }).click();
+  // It's only ever yours, so there's no choosing who plays.
+  await expect(dialog.getByRole('radiogroup', { name: "Who's playing?" })).toHaveCount(0);
+  await dialog.getByRole('radio', { name: /Pine/ }).click();
+  await expect(dialog.getByLabel('Its name')).toHaveValue('Matsu');
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(admin.locator('.game-head')).toContainText('Matsu the pine');
+
+  // It arrives a little dry and shaggy: water glows first, then trim.
+  const mood = admin.locator('.bonsai-mood');
+  await expect(admin.locator('.bonsai-tool[data-glow]')).toContainText('Water');
+  await admin.getByRole('button', { name: /^Water/ }).click();
+  await expect(mood).toContainText('A good drink');
+  await admin.getByRole('button', { name: /^Water/ }).click();
+  await expect(mood).toContainText('still wet');
+  await expect(admin.locator('.bonsai-tool[data-glow]')).toContainText('Trim');
+  await admin.getByRole('button', { name: /^Trim/ }).click();
+  await shot(admin, '17a-bonsai-trimming');
+  const snips = admin.getByRole('button', { name: 'Trim this shoot' });
+  for (let n = await snips.count(); n > 0; n--) {
+    await snips.first().click();
+    await expect(snips).toHaveCount(n - 1);
+  }
+  await expect(mood).toContainText('All neat and tidy');
+  await admin.getByRole('button', { name: /^Feed/ }).click();
+  await expect(mood).toContainText('Yum');
+  await expect(admin.locator('.bonsai-facts')).toContainText('Fed today');
+
+  // Pots and little things to put by it unlock over the days.
+  await admin.getByRole('button', { name: /^Decorate/ }).click();
+  await expect(admin.getByRole('button', { name: /Moss/ })).toBeDisabled();
+  await expect(admin.getByRole('button', { name: /Moss/ })).toContainText('After 2 days');
+  await expect(admin.getByText('Looked after on 1 day.')).toBeVisible();
+  await shot(admin, '17b-bonsai');
+
+  // It's Alex's: not on Mia's list, and not in the family chat.
+  await kid.goto('/#/games');
+  await expect(kid.locator('.game-item, .empty').first()).toBeVisible();
+  await expect(kid.locator('.game-item', { hasText: 'Matsu' })).toHaveCount(0);
+  await admin.goto('/#/games');
+  await expect(admin.locator('.game-item', { hasText: 'Matsu the pine' })).toBeVisible();
+});
+
+test('Sushi Train: making orders together and sending them down the belt', async () => {
+  await admin.getByRole('link', { name: /^Games\b/ }).click();
+  await admin.getByRole('button', { name: 'New game' }).click();
+  const dialog = admin.getByRole('dialog');
+  await dialog.getByRole('button', { name: /^Sushi Train/ }).click();
+  await dialog.getByRole('radio', { name: '8–10' }).click();
+  await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(admin.locator('.sushi-score')).toContainText('Wave 1 of 5');
+
+  // Tap a customer, then follow what glows until the plate goes down the belt.
+  async function serveNext(page: Page, snap?: string) {
+    await page.locator('.sushi-diner:not([disabled])').first().click();
+    await expect(page.locator('.sushi-recipe')).toBeVisible();
+    for (let step = 0; step < 12; step++) {
+      const glow = page.locator('.sushi-ingredient[data-glow], .btn.sushi-glow');
+      await expect(glow).toHaveCount(1);
+      const sending = /Send down the belt/.test((await glow.textContent()) ?? '');
+      await glow.click();
+      if (sending) break;
+      if (snap && step === 1) await shot(page, snap);
+    }
+    await expect(page.locator('.sushi-on-plate')).toHaveCount(0);
+    await expect(page.locator('.sushi-note')).toContainText('arigatō');
+  }
+
+  await serveNext(admin, '17c-sushi-train');
+  await expect(admin.locator('.sushi-score')).toContainText('1 served');
+
+  // Mia joins from her phone and serves the next customer at her own station.
+  await kid.goto('/#/games');
+  await kid.getByRole('link', { name: /Sushi Train/ }).click();
+  await expect(kid.locator('.sushi-diner[data-served]')).toHaveCount(1);
+  await serveNext(kid, '17d-phone-sushi-train');
+  await expect(admin.locator('.sushi-score')).toContainText('2 served');
+
+  // When everyone has eaten, the next customers come in.
+  while (/Wave 1 of/.test((await admin.locator('.sushi-score').textContent()) ?? '')) await serveNext(admin);
+  await expect(admin.locator('.sushi-score')).toContainText('Wave 2 of 5');
+  await expect(kid.locator('.sushi-score')).toContainText('Wave 2 of 5');
+
+  await admin.getByRole('button', { name: 'Close the sushi bar' }).click();
+  await admin.getByRole('button', { name: 'Close it' }).click();
+  await expect(admin.locator('.sushi-end')).toContainText('The sushi bar is closed');
+  await expect(kid.locator('.sushi-end')).toContainText('Chefs: ');
 });
 
 test('age groups and learn mode', async () => {
@@ -1184,6 +1307,160 @@ test('a kid with no email signs in with a code a grown-up makes', async ({ brows
   await admin.getByRole('button', { name: 'New sign-in code' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Make a code' }).click();
   await expect(admin.locator('.otp-code')).not.toHaveText(code);
+});
+
+test('Learn: holiday phrases in Japanese and French, learned as a family', async () => {
+  await admin.goto('/#/chats');
+  await admin.getByRole('link', { name: /^Learn\b/ }).click();
+  await expect(admin.getByRole('heading', { name: 'Learn', level: 1 })).toBeVisible();
+  await admin.getByRole('radio', { name: /Japanese/ }).click();
+  await admin.getByRole('radio', { name: '8–10' }).click();
+  await expect(admin.locator('.learn-today')).toContainText("Today's phrase, for everyone");
+  await expect(admin.locator('.learn-family')).toContainText('Nobody has marked a Japanese phrase yet');
+
+  // Each phrase has its words, how to say it, a speaker, and I know it.
+  const thanks = admin.locator('.phrase', { hasText: 'ありがとう' }).first();
+  await expect(thanks).toContainText('ah-ree-gah-toh');
+  await expect(thanks.getByRole('button', { name: 'Hear "Thank you"' })).toBeVisible();
+  await thanks.getByRole('button', { name: 'I know "Thank you"' }).click();
+  await expect(thanks.getByRole('button', { name: 'I know "Thank you"' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(admin.locator('.learn-family')).toContainText('1 phrase');
+  await shot(admin, '70-learn-phrases');
+
+  // Mia sees it on her phone, and what she learns shows on Alex's screen.
+  await kid.goto('/#/learn');
+  await kid.getByRole('radio', { name: /Japanese/ }).click();
+  await expect(kid.locator('.learn-family')).toContainText('Alex');
+  await kid.getByRole('button', { name: 'I know "Hello"' }).click();
+  await expect(admin.locator('.learn-family')).toContainText('Mia');
+  await expect(admin.locator('.phrase', { hasText: 'こんにちは' }).locator('.faces .avatar')).toHaveCount(1);
+  await shot(kid, '71-phone-learn');
+
+  // Cards: the English, then the Japanese and how to say it.
+  await admin.getByRole('radio', { name: 'Practise', exact: true }).click();
+  await expect(admin.locator('.flash-count')).toHaveText('1 of 10');
+  await admin.getByRole('button', { name: 'Show me' }).click();
+  await expect(admin.locator('.flash-native')).toBeVisible();
+  await shot(admin, '72-learn-practise');
+  await admin.getByRole('button', { name: 'I knew it' }).click();
+  await expect(admin.locator('.flash-count')).toHaveText('2 of 10');
+  await expect(admin.locator('.learn-family')).toContainText('2 phrases');
+
+  // Characters: a chart of all 46 to tap and hear, and a quiz.
+  await admin.getByRole('radio', { name: 'Characters', exact: true }).click();
+  await expect(admin.getByRole('group', { name: 'Hiragana chart' }).getByRole('button')).toHaveCount(46);
+  await admin.getByRole('button', { name: 'Quiz me on Hiragana' }).click();
+  await admin.locator('.kana-choice').first().click();
+  await expect(admin.locator('.flash-feedback')).toHaveText(/^(Yes! That's|Not quite: it's) \w+\.$/);
+  await shot(admin, '73-learn-characters');
+
+  // French has no characters to learn, but signs to spot.
+  await admin.getByRole('radio', { name: /French/ }).click();
+  await expect(admin.getByRole('radio', { name: 'Characters', exact: true })).toHaveCount(0);
+  await admin.getByRole('radio', { name: 'Signs', exact: true }).click();
+  await expect(admin.locator('.phrase-sign', { hasText: 'Sortie' })).toContainText('sor-tee');
+  await shot(admin, '74-learn-signs');
+});
+
+test('Learn: bullet trains for everyone, and road signs and a road test for grown-ups', async () => {
+  // Answers every question right: from the quiz's own list, or for a sign, from its picture.
+  const answers = new Map([...roadRules, ...trainQuestions].map((q) => [q.q, q.right]));
+  async function answerAll(page: Page, count: number) {
+    const quiz = page.locator('.quiz');
+    for (let i = 0; i < count; i++) {
+      await expect(page.locator('.flash-count')).toHaveText(`${i + 1} of ${count}`);
+      const q = (await quiz.locator('.quiz-q').textContent()) ?? '';
+      const right = answers.get(q) ?? ((await quiz.locator('.road-sign-picture').getAttribute('aria-label')) ?? '').replace(/^Sign: /, '');
+      await quiz.getByRole('button', { name: right, exact: true }).click();
+      await expect(quiz.locator('.flash-feedback')).toHaveText('Yes!');
+      await quiz.getByRole('button', { name: i === count - 1 ? 'See how you did' : 'Next' }).click();
+    }
+  }
+  const result = (page: Page) => page.locator('.flashcard[role="status"]');
+
+  await admin.goto('/#/learn');
+  await admin.getByRole('radio', { name: /Japanese/ }).click();
+  await admin.getByRole('radio', { name: 'Travel', exact: true }).click();
+  await expect(admin.getByRole('radiogroup', { name: 'Ages' })).toHaveCount(0);
+  await admin.getByRole('radio', { name: /Bullet trains/ }).click();
+  await admin.getByRole('button', { name: 'Bullet train quiz' }).click();
+  await answerAll(admin, 8);
+  await expect(result(admin)).toContainText('8 of 8 right');
+  await expect(result(admin)).toContainText("You're a bullet train expert!");
+  await admin.getByRole('button', { name: 'Done' }).click();
+  await expect(admin.locator('.travel-badge')).toContainText('bullet train expert');
+  await expect(admin.locator('.learn-family')).toContainText('Bullet train expert');
+  await shot(admin, '75-learn-bullet-trains');
+
+  // Driving: every sign drawn, each to mark as known, and the road test.
+  await admin.getByRole('radio', { name: /Driving/ }).click();
+  await expect(admin.locator('.road-sign')).toHaveCount(roadSigns.length);
+  await expect(admin.getByRole('img', { name: 'Sign: Stop' })).toBeVisible();
+  await admin.getByRole('button', { name: 'I know "Stop"' }).click();
+  await expect(admin.locator('.learn-family')).toContainText('1 road sign');
+  await shot(admin, '76-learn-road-signs');
+  await admin.getByRole('button', { name: 'Take the road test' }).click();
+  await answerAll(admin, 10);
+  await expect(result(admin)).toContainText('10 of 10 right');
+  await expect(result(admin)).toContainText('You passed the road test!');
+  await admin.getByRole('button', { name: 'Done' }).click();
+  await expect(admin.locator('.learn-family')).toContainText('Passed the road test');
+
+  // Station signs have their own heading in Signs.
+  await admin.getByRole('radio', { name: 'Signs', exact: true }).click();
+  await expect(admin.getByRole('heading', { name: 'At the station' })).toBeVisible();
+  await expect(admin.locator('.phrase-sign', { hasText: '改札' })).toContainText('kai-sat-soo');
+
+  // Mia has bullet trains but no driving, and sees Alex's pass come in.
+  await kid.goto('/#/learn');
+  await kid.getByRole('radio', { name: /Japanese/ }).click();
+  await kid.getByRole('radio', { name: 'Travel', exact: true }).click();
+  await kid.getByRole('radio', { name: /Bullet trains/ }).click();
+  await expect(kid.getByRole('button', { name: 'Bullet train quiz' })).toBeVisible();
+  await expect(kid.getByRole('radio', { name: /Driving/ })).toHaveCount(0);
+  await expect(kid.locator('.learn-family')).toContainText('Passed the road test');
+  await kid.getByRole('button', { name: 'Bullet train quiz' }).click();
+  await kid.locator('.quiz-choice').first().click();
+  await expect(kid.locator('.quiz-why')).not.toBeEmpty();
+  await shot(kid, '77-phone-bullet-train-quiz');
+});
+
+test('Learn: counting down to Japan, and spotting things on the trip', async () => {
+  await admin.goto('/#/learn');
+  await admin.getByRole('radio', { name: /Japanese/ }).click();
+  // A grown-up sets the date, three weeks away.
+  const trip = new Date(Date.now() + 21 * 86_400_000);
+  const iso = [trip.getFullYear(), String(trip.getMonth() + 1).padStart(2, '0'), String(trip.getDate()).padStart(2, '0')].join('-');
+  await admin.getByLabel('When do you go to Japan?').fill(iso);
+  await admin.getByRole('button', { name: 'Start the countdown' }).click();
+  await expect(admin.locator('.countdown')).toContainText('21 sleeps until Japan!');
+  await expect(admin.locator('.countdown-weeks')).toHaveText("That's 3 weeks.");
+  await expect(admin.locator('.countdown')).toContainText('Did you know?');
+  await shot(admin, '78-learn-countdown');
+
+  // Mia sees it too, but can't change it.
+  await kid.goto('/#/learn');
+  await kid.getByRole('radio', { name: /Japanese/ }).click();
+  await expect(kid.locator('.countdown')).toContainText('21 sleeps until Japan!');
+  await expect(kid.getByRole('button', { name: 'Change the date' })).toHaveCount(0);
+
+  // Spot it: four in a row is bingo, and Alex sees who spotted what.
+  await kid.getByRole('radio', { name: 'Travel', exact: true }).click();
+  await kid.getByRole('radio', { name: /Spot it/ }).click();
+  for (const name of ['Shrine gate', 'Mount Fuji', 'Bullet train', 'Deer']) await kid.getByRole('button', { name, exact: true }).click();
+  await expect(kid.locator('.spot-score')).toContainText('Bingo!');
+  await expect(kid.getByRole('button', { name: 'Deer', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await shot(kid, '79-phone-spot-it');
+  await admin.getByRole('radio', { name: 'Travel', exact: true }).click();
+  await admin.getByRole('radio', { name: /Spot it/ }).click();
+  await expect(admin.getByRole('button', { name: 'Deer', exact: true }).locator('.faces .avatar')).toHaveCount(1);
+  await expect(admin.locator('.learn-family')).toContainText('4 spotted');
+
+  // No date after all: the countdown goes, and the question comes back.
+  await admin.getByRole('button', { name: 'Change the date' }).click();
+  await admin.getByRole('button', { name: 'No date yet' }).click();
+  await expect(admin.locator('.countdown')).toHaveCount(0);
+  await expect(admin.getByLabel('When do you go to Japan?')).toBeVisible();
 });
 
 test('no text runs out of its box on any screen', async () => {

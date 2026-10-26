@@ -2,10 +2,11 @@ defmodule Family.PushTest do
   use FamilyWeb.ConnCase, async: false
   import Ecto.Query
   alias Family.{Calls, Chat, FakePush, Games, Repo}
-  alias Family.Push.{Subscription, WebPush}
+  alias Family.Push.{App, Inbox, Subscription, WebPush}
 
   setup do
     {:ok, base} = FakePush.start(self())
+    Family.RateLimit.reset({:inbox, {127, 0, 0, 1}})
     admin = admin_fixture()
     lucy = person_fixture(admin, "grownup", "Lucy")
     kid = person_fixture(admin, "kid", "Mia")
@@ -19,6 +20,16 @@ defmodule Family.PushTest do
 
   defp switch_on(conn, browser, endpoint) do
     conn |> post("/api/push/subscriptions", %{"subscription" => FakePush.subscription(browser, endpoint), "device" => "Chrome on Android"}) |> json_response(200)
+  end
+
+  # The Android app, switched on from the page inside it.
+  defp app_on(conn, extra \\ %{}) do
+    conn |> post("/api/push/app", Map.merge(%{"device" => "Kitchen Table app on Galaxy Tab A9"}, extra)) |> json_response(200)
+  end
+
+  # The app checking from the background, with its key and no cookie.
+  defp inbox(key, seen \\ nil) do
+    build_conn() |> put_req_header("authorization", "Bearer " <> key) |> get("/api/push/inbox", if(seen, do: %{"seen" => seen}, else: %{}))
   end
 
   defp looking(user, active) do
@@ -193,5 +204,93 @@ defmodule Family.PushTest do
     {:ok, _} = Family.Accounts.set_permissions(admin, lucy, %{"play_games" => false}, nil)
     {:ok, _} = Games.move(admin, game.id, %{"version" => game.version, "state" => %{"turn" => "b"}})
     refute_receive {:push, "/lucy", _, _}, 200
+  end
+
+  test "the Android app fetches its own notifications with its key, not the cookie", %{admin: admin, room: room} do
+    lucy = signed_in("Lucy")
+    assert %{"token" => key, "endpoint" => "app:" <> _ = endpoint, "devices" => [device]} = app_on(lucy)
+    assert %{"device" => "Kitchen Table app on Galaxy Tab A9", "last_used_at" => nil} = device
+    refute Map.has_key?(device, "token")
+
+    {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Tea's ready"})
+    assert %{"notifications" => [%{"id" => id, "kind" => "message", "body" => "Alex: Tea's ready", "url" => url}]} = inbox(key) |> json_response(200)
+    assert url == "/#/chats/#{room.id}"
+
+    # It waits until the app says it has shown it, so none go missing.
+    assert %{"notifications" => [%{"id" => ^id}]} = inbox(key) |> json_response(200)
+    assert %{"notifications" => []} = inbox(key, id) |> json_response(200)
+    {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Coats on"})
+    {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Shoes on"})
+    assert %{"notifications" => [%{"id" => a, "body" => "Alex: Coats on"}, %{"id" => b}]} = inbox(key) |> json_response(200)
+    assert %{"notifications" => []} = inbox(key, "#{a},#{b}") |> json_response(200)
+    assert %{"devices" => [%{"last_used_at" => used}]} = lucy |> get("/api/push") |> json_response(200)
+    assert used
+
+    # The cookie alone won't do, nor will a made-up key.
+    assert lucy |> get("/api/push/inbox") |> json_response(401)
+    assert inbox(Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)) |> json_response(401)
+    assert inbox("nonsense") |> json_response(401)
+
+    # Opening the app again keeps the same key and the same device.
+    assert %{"token" => ^key, "endpoint" => ^endpoint, "devices" => [_]} = app_on(lucy, %{"token" => key})
+
+    # The test button reaches it too.
+    lucy |> post("/api/push/test", %{"endpoint" => endpoint}) |> json_response(200)
+    assert %{"notifications" => [%{"kind" => "test", "url" => "/#/me"}]} = inbox(key) |> json_response(200)
+
+    # Switching it off stops them.
+    assert %{"devices" => []} = lucy |> delete("/api/push/subscriptions", %{"endpoint" => endpoint}) |> json_response(200)
+    assert inbox(key) |> json_response(401)
+  end
+
+  test "what waits for the app is replaced, joined up and dropped as a push service would", %{admin: admin, lucy: lucy, room: room} do
+    %{"token" => key, "endpoint" => endpoint} = app_on(signed_in("Lucy"))
+    sub = Repo.one!(from s in Subscription, where: s.endpoint == ^endpoint)
+    waiting = fn -> inbox(key) |> json_response(200) |> Map.fetch!("notifications") end
+
+    # Lucy is asked to play, then it's her turn: only her turn is news now.
+    {:ok, game} =
+      Games.create(admin, room.id, %{"type" => "chess", "mode" => "versus", "seats" => %{"w" => admin.id, "b" => lucy.id}, "state" => %{"turn" => "w"}})
+
+    {:ok, _} = Games.move(admin, game.id, %{"version" => game.version, "state" => %{"turn" => "b"}})
+    assert [%{"kind" => "turn", "url" => url}] = waiting.()
+    assert url == "/#/games/#{game.id}"
+
+    # A chat keeps its last five messages, to join up in one notification.
+    for n <- 1..7, do: {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Message #{n}"})
+    assert for(%{"kind" => "message", "body" => body} <- waiting.(), do: body) == for(n <- 3..7, do: "Alex: Message #{n}")
+
+    # A missed call replaces the ringing; anything out of date goes.
+    App.send(sub, %{kind: "call", title: "Alex is calling"}, ttl: 45, topic: "call-1")
+    App.send(sub, %{kind: "missed", title: "Missed call from Alex"}, topic: "call-1")
+    assert [%{"kind" => "missed"}] = Enum.filter(waiting.(), &(&1["kind"] in ["call", "missed"]))
+    Repo.update_all(from(i in Inbox, where: i.topic == "call-1"), set: [expires_at: DateTime.add(DateTime.utc_now(:second), -1)])
+    refute Enum.any?(waiting.(), &(&1["kind"] == "missed"))
+
+    # A device that's been away a long time keeps the newest 50.
+    for n <- 1..60, do: App.send(sub, %{kind: "family", title: "News #{n}"}, topic: "news-#{n}")
+    assert [%{"title" => "News 11"} | _] = list = waiting.()
+    assert length(list) == 50
+  end
+
+  test "the app's device goes to whoever signs in on it next, without what was waiting for the last person",
+       %{admin: admin, lucy: lucy, room: room} do
+    %{"token" => key, "endpoint" => endpoint} = app_on(signed_in("Lucy"))
+    {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Just for Lucy"})
+
+    # Lucy's sign-in runs out, so the app hears nothing for now.
+    Repo.update_all(from(t in Family.Accounts.Token, where: t.user_id == ^lucy.id), set: [last_used_at: ~U[2020-01-01 00:00:00Z]])
+    assert inbox(key) |> json_response(401)
+
+    # Mia signs in on the tablet, and the page there hands back the app's key.
+    mia = signed_in("Mia")
+    assert %{"token" => ^key, "endpoint" => ^endpoint, "devices" => [_]} = app_on(mia, %{"token" => key})
+    assert %{"notifications" => []} = inbox(key) |> json_response(200)
+    {:ok, _} = Chat.post_message(admin, room.id, %{"body" => "Hello Mia"})
+    assert %{"notifications" => [%{"body" => "Alex: Hello Mia"}]} = inbox(key) |> json_response(200)
+
+    # Signing out there stops them.
+    mia |> delete("/api/session") |> json_response(200)
+    assert inbox(key) |> json_response(401)
   end
 end

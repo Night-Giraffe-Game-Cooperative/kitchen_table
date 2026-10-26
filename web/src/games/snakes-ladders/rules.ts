@@ -2,7 +2,7 @@
 // hopping along the board, ladders and snakes, the exact finish, and whose
 // turn comes next. The board lives in the game's state, so everyone sees the
 // same one and a game keeps its board even if these change later.
-import { nextSeat } from '../common';
+import { nextSeat, type PlayerSeat } from '../common';
 import type { Band } from '../bands';
 
 export interface Board {
@@ -245,6 +245,21 @@ export function rollTurn(s: State, seats: Record<string, unknown>, order: string
     next = takeTurn(next, order, next.turn, rollDie(random));
   }
   return next;
+}
+
+/**
+ * Who plays the next game taking turns: the same players with the next one
+ * starting and any open places kept. Anyone no longer in the chat is left
+ * out, as the server won't seat them, and if only one player is left there
+ * is a place for someone to join.
+ */
+export function nextPlayers(players: unknown[], members?: number[]): PlayerSeat[] {
+  const seated = players.filter((p): p is number => typeof p === 'number');
+  const open = players.filter((p): p is 'open' => p === 'open');
+  const still = [...seated.slice(1), ...seated.slice(0, 1)].filter((id) => !members || members.includes(id));
+  const out: PlayerSeat[] = [...still, ...open];
+  while (out.length < 2) out.push('open');
+  return out;
 }
 
 /** The rolls in the most recent move, in order: a person's roll and the Night Giraffe's straight after it. */

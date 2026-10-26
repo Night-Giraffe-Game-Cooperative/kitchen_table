@@ -18,6 +18,7 @@ import {
   nudge,
   placeWords,
   trendOf,
+  waitsFor,
   type Guess,
   type State,
 } from './rules';
@@ -184,6 +185,22 @@ describe("Where's the Giraffe?", () => {
     expect(nudge(p, 'Enter', wide)).toBeNull();
     expect(placeWords({ x: 0.1, y: 0.1 })).toBe('at the top, on the far left');
     expect(placeWords({ x: 0.5, y: 0.5 })).toBe('halfway down, in the middle');
+  });
+
+  it('waits on the hider, then on every seeker who has not had a guess yet', () => {
+    const hider = 1;
+    const s = fresh(wide, '8-10');
+    expect(waitsFor(s, hider, hider)).toBe(true);
+    expect(waitsFor(s, hider, 2)).toBe(false);
+    const seeking = hidden({ x: 0.7, y: 0.3 });
+    expect(waitsFor(seeking, hider, hider)).toBe(false);
+    expect(waitsFor(seeking, hider, 2)).toBe(true);
+    const missed = guess(seeking, { x: 0.1, y: 0.9 }, 2, hider)!.state;
+    expect(waitsFor(missed, hider, 2)).toBe(false);
+    expect(waitsFor(missed, hider, 3)).toBe(true);
+    const found = guess(missed, { x: 0.7, y: 0.3 }, 2, hider)!.state;
+    expect(waitsFor(found, hider, 3)).toBe(false);
+    expect(waitsFor({ ...seeking, ended: 'stopped' }, hider, 3)).toBe(false);
   });
 
   it('writes the summary', () => {

@@ -160,6 +160,17 @@ export function guess(state: State, at: Spot, by: number, hider: unknown): { sta
   return { state: found ? { ...next, foundBy: by, ended: 'found' } : next, found };
 }
 
+/**
+ * Whether the game is waiting on this person, so it shows under Your turn:
+ * the hider until he's hidden, then each seeker until they've had a guess.
+ */
+export function waitsFor(state: State, hider: unknown, me: number): boolean {
+  if (state.ended || state.foundBy != null) return false;
+  if (state.turn === 'hider') return hider === me;
+  // Used for the Games list too, so careful with a saved game missing its guesses.
+  return !!state.spot && hider !== me && !(state.guesses ?? []).some((g) => g.by === me);
+}
+
 /** Whether a seeker may ask to see where he is. */
 export const canShow = (state: State) => state.turn === 'anyone' && !!state.spot && !state.ended && state.guesses.length >= SHOW_AFTER;
 

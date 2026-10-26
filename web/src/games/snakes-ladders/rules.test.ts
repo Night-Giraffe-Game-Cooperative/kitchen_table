@@ -14,6 +14,7 @@ import {
   latestRolls,
   linkList,
   newGame,
+  nextPlayers,
   problems,
   rollDie,
   rollTurn,
@@ -281,6 +282,19 @@ describe('against the Night Giraffe', () => {
 
   it("only the seat whose turn it is can roll", () => {
     expect(rollTurn(newGame(b, order), seats, order, GIRAFFE, dice(3))).toBeNull();
+  });
+});
+
+describe('playing again', () => {
+  it('keeps the same players, with the next one starting and open places kept', () => {
+    expect(nextPlayers([7, 9, 11])).toEqual([9, 11, 7]);
+    expect(nextPlayers([7, 'open', 9], [7, 9])).toEqual([9, 7, 'open']);
+  });
+
+  it("leaves out anyone who has left the chat, so the server doesn't refuse the next game", () => {
+    expect(nextPlayers([7, 9, 11], [7, 11])).toEqual([11, 7]);
+    // Down to one player: a place for someone to join.
+    expect(nextPlayers([7, 9], [7])).toEqual([7, 'open']);
   });
 });
 

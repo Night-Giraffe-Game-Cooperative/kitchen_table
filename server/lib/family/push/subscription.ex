@@ -7,6 +7,8 @@ defmodule Family.Push.Subscription do
     field :endpoint, :string, redact: true
     field :p256dh, :string, redact: true
     field :auth, :string, redact: true
+    # Only for the Android app, which fetches its own (Family.Push.App).
+    field :secret_hash, :binary, redact: true
     field :device, :string
     field :last_used_at, :utc_datetime
     timestamps(type: :utc_datetime)

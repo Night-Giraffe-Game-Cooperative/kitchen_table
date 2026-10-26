@@ -39,12 +39,19 @@ function Board({ game, play, me, people }: GameProps<State>) {
       const blob = await toBlob(canvas, 'image/png');
       const { media, media_id } = await upload(game.room_id, { blob, width: canvas.width, height: canvas.height });
       const names = listNames(artists.map((id) => nameOf(people, id)));
-      await api.post(`/api/rooms/${game.room_id}/messages`, { kind: 'doodle', body: `${s.prompt}, by ${names || 'the family'}`, media_id });
-      await play.move((st) => ({
-        state: { ...st, picture: media.url },
-        status: 'finished',
-        summary: `${names || 'The family'} drew ${st.prompt} together`,
-      }));
+      let added = false;
+      const ok = await play.move((st, g) => {
+        if (g.status !== 'active') return null;
+        // Someone drew more while the picture was being saved: it would be missing from it.
+        if ((st.strokes ?? []).length !== strokes.length) {
+          added = true;
+          return null;
+        }
+        return { state: { ...st, picture: media.url }, status: 'finished', summary: `${names || 'The family'} drew ${st.prompt} together` };
+      });
+      if (added) toast("Someone's still drawing. Have a look, then share it when they've finished.", 'info');
+      // Only whoever finished the game shares it, so pressing at the same time doesn't put it in the chat twice.
+      if (ok) await api.post(`/api/rooms/${game.room_id}/messages`, { kind: 'doodle', body: `${s.prompt}, by ${names || 'the family'}`, media_id });
     } catch (e) {
       toast((e as Error).message, 'danger');
     } finally {

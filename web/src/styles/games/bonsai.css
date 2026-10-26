@@ -1,0 +1,395 @@
+/*
+ * Bonsai: the tree is a watercolour painting on cream paper, so it stays
+ * cream in dark mode too, like a picture on the wall. Below it, big picture
+ * buttons for the day's jobs; the one that needs doing glows.
+ */
+
+.bonsai {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.bonsai-scene.sheet {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: #f8f2e6;
+  aspect-ratio: 400 / 440;
+}
+
+.bonsai-picture {
+  height: 100%;
+}
+
+.bonsai-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bonsai-soil {
+  transition: fill 1.2s ease;
+}
+
+.bonsai-mood {
+  margin: 0;
+  min-height: 2.9em;
+  text-align: center;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+/* ---------- The jobs ---------- */
+
+.bonsai-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.1rem, 1fr));
+  gap: 0.4rem;
+}
+
+.bonsai-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-height: 5.4rem;
+  padding: 0.5rem 0.2rem 0.45rem;
+  border: 1.5px solid var(--divider);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s ease;
+}
+
+.bonsai-tool:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.bonsai-tool:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.bonsai-tool[aria-pressed='true'] {
+  border-color: var(--meadow);
+  background: var(--meadow-tint);
+}
+
+.bonsai-tool-art {
+  font-size: 1.9rem;
+  line-height: 1.2;
+}
+
+.bonsai-tool-label {
+  font-weight: 750;
+}
+
+.bonsai-tool-hint {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.bonsai-tool[data-glow] {
+  border-color: var(--sunflower);
+  box-shadow: 0 0 0 3px var(--sunflower-tint);
+  animation: bonsai-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes bonsai-glow {
+  50% {
+    box-shadow: 0 0 0 7px var(--sunflower-tint);
+  }
+}
+
+.bonsai-facts {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+/* ---------- Tapping on the picture ---------- */
+
+.bonsai-snip-spot,
+.bonsai-visitor {
+  position: absolute;
+  width: 3rem;
+  height: 3rem;
+  margin: -1.5rem 0 0 -1.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.bonsai-snip-spot {
+  display: grid;
+  place-items: center;
+  border: 2px dashed #6b8f45;
+  background: rgb(255 253 245 / 0.75);
+  font-size: 1.15rem;
+  animation: bonsai-ring 1.6s ease-in-out infinite;
+}
+
+@keyframes bonsai-ring {
+  50% {
+    box-shadow: 0 0 0 5px rgb(255 253 245 / 0.6);
+  }
+}
+
+/* Under the scissors, if a visitor sits on a shoot. */
+.bonsai-visitor {
+  z-index: 1;
+  border: 0;
+  background: transparent;
+}
+
+.bonsai-snip-spot {
+  z-index: 2;
+}
+
+.bonsai-visitor:focus-visible,
+.bonsai-snip-spot:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Things moving in the picture ---------- */
+
+.bonsai-drop {
+  animation: bonsai-drop 0.9s ease-in infinite;
+}
+
+@keyframes bonsai-drop {
+  from {
+    transform: translate(0, 0);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(-12px, 72px);
+    opacity: 0;
+  }
+}
+
+.bonsai-leaf-fall {
+  opacity: 0;
+  animation: bonsai-leaf 11s ease-in-out infinite;
+}
+
+@keyframes bonsai-leaf {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  8% {
+    opacity: 0.95;
+  }
+  35% {
+    transform: translate(18px, 60px) rotate(120deg);
+  }
+  65% {
+    transform: translate(-8px, 120px) rotate(220deg);
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(14px, 190px) rotate(330deg);
+  }
+}
+
+.bonsai-snow {
+  opacity: 0;
+  animation: bonsai-snow 12s linear infinite;
+}
+
+@keyframes bonsai-snow {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(10px, 220px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-6px, 440px);
+  }
+}
+
+.bonsai-flap {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bonsai-flap 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes bonsai-flap {
+  to {
+    transform: scaleX(0.35);
+  }
+}
+
+.bonsai-snip {
+  animation: bonsai-snip 1.1s ease-in forwards;
+}
+
+@keyframes bonsai-snip {
+  to {
+    transform: translate(10px, 150px) rotate(140deg);
+    opacity: 0;
+  }
+}
+
+.bonsai-peek {
+  animation: bonsai-peek 1.4s ease-out both;
+}
+
+@keyframes bonsai-peek {
+  from {
+    transform: translateX(40px);
+  }
+}
+
+/* ---------- Decorate ---------- */
+
+.bonsai-decorate.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem 0.5rem;
+}
+
+.bonsai-decorate h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.bonsai-decorate p {
+  margin: 0;
+}
+
+.bonsai-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.bonsai-choice {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 5.5rem;
+  min-height: 3rem;
+  padding: 0.45rem 0.7rem;
+  border: 1.5px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bonsai-choice[aria-checked='true'],
+.bonsai-choice[aria-pressed='true'] {
+  border-color: var(--meadow);
+  background: var(--meadow-tint);
+  font-weight: 700;
+}
+
+.bonsai-choice:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.bonsai-swatch {
+  width: 1.6rem;
+  height: 0.9rem;
+  border-radius: 0.2rem 0.2rem 0.5rem 0.5rem;
+  border: 1px solid rgb(0 0 0 / 0.15);
+}
+
+.bonsai-locked {
+  color: var(--muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+/* ---------- Choosing a tree ---------- */
+
+.bonsai-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.bonsai-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 0.5rem;
+  border: 1.5px solid var(--divider);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.bonsai-kind[aria-checked='true'] {
+  border-color: var(--meadow);
+  background: var(--meadow-tint);
+}
+
+.bonsai-kind-art {
+  font-size: 2rem;
+}
+
+.bonsai-kind .muted {
+  font-size: var(--text-sm);
+}
+
+/* Tablets and computers: the tree on the left, the jobs beside it. */
+@media (min-width: 56rem) {
+  .bonsai {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 1fr);
+    align-items: start;
+    column-gap: 1.25rem;
+    max-width: 62rem;
+  }
+
+  .bonsai-scene.sheet {
+    grid-row: 1 / span 6;
+  }
+
+  .bonsai-mood {
+    margin-top: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bonsai-tool[data-glow],
+  .bonsai-snip-spot,
+  .bonsai-drop,
+  .bonsai-flap,
+  .bonsai-peek {
+    animation: none;
+  }
+
+  .bonsai-leaf-fall,
+  .bonsai-snow,
+  .bonsai-snip {
+    display: none;
+  }
+}

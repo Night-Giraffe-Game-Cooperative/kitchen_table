@@ -4,7 +4,9 @@ defmodule Family.Push do
   new message, a call ringing or missed, and a turn in a game. Each device
   switches them on from the Me page. Its browser gives an address at its
   push service, kept against the session that asked, so signing out on that
-  device stops them.
+  device stops them. The Kitchen Table Android app has no push service, so
+  its notifications wait here for it to fetch (`Family.Push.App`); who gets
+  what, and when, is the same.
 
   Nobody gets a notification about what they could already see: while the
   app is open and in use on any of their devices, it shows things there
@@ -17,7 +19,7 @@ defmodule Family.Push do
   alias Family.{Accounts, Permissions, Repo}
   alias Family.Accounts.{Token, User}
   alias Family.Chat.{Member, Message, Room}
-  alias Family.Push.{Subscription, WebPush}
+  alias Family.Push.{App, Subscription, WebPush}
 
   @max_devices 20
 
@@ -75,6 +77,54 @@ defmodule Family.Push do
   end
 
   def subscribe(_, _, _), do: {:error, "That device's notification details don't look right."}
+
+  @doc """
+  Switches on notifications in the Kitchen Table Android app on a device,
+  for this person and session. The app gives back the key it was given
+  before, if it has one, so the device keeps its place, whoever had it.
+  Gives the device's `endpoint` and the `token` it fetches them with.
+  """
+  def subscribe_app(%User{} = user, token_id, attrs) when is_integer(token_id) do
+    hash = App.key_hash(attrs["token"])
+    device = device_name(attrs["device"])
+
+    result =
+      case hash && Repo.one(from s in Subscription, where: s.secret_hash == ^hash) do
+        %Subscription{} = sub ->
+          # What was waiting for someone else isn't for this person.
+          if sub.user_id != user.id, do: App.forget(sub)
+
+          sub
+          |> Ecto.Changeset.change(user_id: user.id, token_id: token_id, device: device || sub.device, updated_at: DateTime.utc_now(:second))
+          |> Repo.update!()
+
+          %{endpoint: sub.endpoint, token: attrs["token"]}
+
+        _ ->
+          {endpoint, token, hash} = App.new_device()
+          Repo.insert!(%Subscription{user_id: user.id, token_id: token_id, endpoint: endpoint, p256dh: "", auth: "", secret_hash: hash, device: device})
+          %{endpoint: endpoint, token: token}
+      end
+
+    trim(user)
+    {:ok, result}
+  end
+
+  def subscribe_app(_, _, _), do: {:error, "Sign in again, then switch notifications on."}
+
+  @doc """
+  What's waiting for the Android app on the device with this key, once it
+  says which (by id) it has already shown. `:unknown` means the device isn't
+  switched on (any more), such as after signing out there.
+  """
+  def inbox(key, seen) do
+    with hash when is_binary(hash) <- App.key_hash(key),
+         %Subscription{} = sub <- Repo.one(from s in live(), where: s.secret_hash == ^hash) do
+      {:ok, App.take(sub, seen)}
+    else
+      _ -> :unknown
+    end
+  end
 
   defp check_endpoint(endpoint) do
     uri = URI.parse(endpoint)
@@ -306,7 +356,12 @@ defmodule Family.Push do
     :ok
   end
 
+  # The Android app fetches its own, so they wait for it instead.
   defp send_one(sub, payload, opts) do
+    if App.app?(sub), do: App.send(sub, payload, opts), else: send_web(sub, payload, opts)
+  end
+
+  defp send_web(sub, payload, opts) do
     case WebPush.send(sub, Jason.encode!(payload), opts) do
       :ok ->
         Repo.update_all(from(s in Subscription, where: s.id == ^sub.id), set: [last_used_at: DateTime.utc_now(:second)])

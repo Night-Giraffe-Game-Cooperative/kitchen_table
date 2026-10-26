@@ -3,7 +3,7 @@
 // chat (players and anyone reading along) gives a star to each line they love,
 // though never their own. The writer whose lines collect the most stars wins,
 // and the line with the most stars is the best line.
-import { leaders, listNames, nextSeat, placings } from '../common';
+import { leaders, listNames, nextSeat, placings, seatOf } from '../common';
 import type { Band } from '../bands';
 
 export interface Line {
@@ -60,6 +60,16 @@ export function markDone(s: StoryVersus, voter: number): StoryVersus | null {
 /** Whether every player has given their stars. */
 export function everyoneStarred(s: StoryVersus, players: number[]): boolean {
   return players.every((id) => s.done.includes(id));
+}
+
+/**
+ * Whether the story is waiting on this person: to write the next line, or,
+ * once it's written, to give their stars. Stars time has no seat's turn, so
+ * without this it wouldn't show under "Your turn" for anyone.
+ */
+export function waitsOn(s: StoryVersus, seats: Record<string, unknown>, me: number): boolean {
+  if (s.phase === 'writing') return seats[s.turn] === me;
+  return !!seatOf(seats, me) && !s.done.includes(me);
 }
 
 export const starsFor = (s: StoryVersus, line: number) => (s.stars[line] ?? []).length;

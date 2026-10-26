@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BANDS } from '../bands';
 import {
   addQuestion,
+  begun,
   canStart,
   choicesFor,
   draftProblem,
@@ -103,6 +104,13 @@ describe('Family Quiz writing', () => {
     expect(draftProblem(draft('Food?', 'Pizza', 'Pasta', ''), 3)).toMatch(/every box/);
     expect(draftProblem(draft('Food?', 'Pizza', 'pizza '), 2)).toMatch(/the same/);
     expect(draftProblem(draft('Food?', 'Pizza', 'Pasta', 'Chips', 'Soup'), 3)).toBeNull();
+  });
+
+  it('knows when a question has been started, so the writer can be told if the quiz starts without it', () => {
+    expect(begun(draft('', '', '', ''))).toBe(false);
+    expect(begun(draft('  ', ' ', ''))).toBe(false);
+    expect(begun(draft('Food?', '', ''))).toBe(true);
+    expect(begun(draft('', '', '', 'Soup'))).toBe(true);
   });
 
   it('trims and shortens what was typed', () => {

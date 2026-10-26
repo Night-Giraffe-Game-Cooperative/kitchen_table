@@ -32,7 +32,9 @@ defmodule Family.Games do
     "wheres_giraffe" => ~w(coop),
     "dots_boxes" => ~w(coop versus),
     "family_quiz" => ~w(coop),
-    "snakes_ladders" => ~w(coop versus)
+    "snakes_ladders" => ~w(coop versus),
+    "bonsai" => ~w(coop),
+    "sushi_train" => ~w(coop)
   }
 
   @names %{
@@ -49,7 +51,9 @@ defmodule Family.Games do
     "wheres_giraffe" => "Where's the Giraffe?",
     "dots_boxes" => "the Dots and Boxes game",
     "family_quiz" => "the Family Quiz",
-    "snakes_ladders" => "the Snakes and Ladders game"
+    "snakes_ladders" => "the Snakes and Ladders game",
+    "bonsai" => "the bonsai",
+    "sushi_train" => "the Sushi Train game"
   }
 
   # What a live doodle may add to without a version check.
@@ -88,10 +92,14 @@ defmodule Family.Games do
     |> Enum.map(&Present.game/1)
   end
 
-  # One person against the computer is theirs alone, so it isn't on anyone else's list.
-  defp someone_elses_solo?(%Game{seats: seats}, %User{id: id}) do
+  # Games only ever played by one person, like a bonsai to look after.
+  @solo ~w(bonsai)
+
+  # One person against the computer, or tending their bonsai, is theirs alone,
+  # so it isn't on anyone else's list.
+  defp someone_elses_solo?(%Game{type: type, seats: seats}, %User{id: id}) do
     holders = Map.values(seats || %{})
-    "computer" in holders and Enum.count(holders, &is_integer/1) == 1 and id not in holders
+    ("computer" in holders or type in @solo) and Enum.count(holders, &is_integer/1) == 1 and id not in holders
   end
 
   def create(%User{} = user, room_id, %{"after" => after_id} = attrs) when not is_nil(after_id) do
@@ -184,8 +192,9 @@ defmodule Family.Games do
     Referee.run(fn ->
       with %Game{} = game <- get_for(user, game_id) || {:error, :not_found},
            :ok <- may_play(user, game.room_id, :play_games),
-           :ok <- if(game.status == "active", do: :ok, else: {:error, "That game has finished."}),
+           # A move made just as the game ended is someone moving first, not an error.
            :ok <- if(attrs["version"] == game.version, do: :ok, else: {:error, :conflict}),
+           :ok <- if(game.status == "active", do: :ok, else: {:error, "That game has finished."}),
            :ok <- my_turn(user, game),
            state when is_map(state) <- attrs["state"] || {:error, "Send the new board."},
            :ok <- check_state(state) do
@@ -242,6 +251,8 @@ defmodule Family.Games do
   end
 
   @idle_hours 48
+  # Games that carry on for weeks, like a bonsai, which grows while nobody looks.
+  @ongoing ~w(bonsai)
 
   @doc """
   Finishes every game nobody has touched for two days, so the Games list
@@ -252,7 +263,7 @@ defmodule Family.Games do
     cutoff = DateTime.add(now, -@idle_hours * 3600)
 
     Referee.run(fn ->
-      from(g in Game, where: g.status == "active" and g.updated_at < ^cutoff)
+      from(g in Game, where: g.status == "active" and g.updated_at < ^cutoff and g.type not in @ongoing)
       |> Repo.all()
       |> Enum.map(fn game ->
         game
@@ -270,7 +281,15 @@ defmodule Family.Games do
   end
 
   defp may_stop?(user, game),
-    do: game.created_by_id == user.id or user.id in Map.values(game.seats) or Permissions.can?(user, :manage_people)
+    do: game.created_by_id == user.id or user.id in Map.values(game.seats) or Permissions.can?(user, :manage_people) or turn_gone?(game)
+
+  # Whose turn it is has left the chat, so nobody can play on: anyone still in it may stop the game.
+  defp turn_gone?(%Game{state: state, seats: seats, room_id: room_id}) do
+    case Map.get(seats || %{}, Map.get(state || %{}, "turn")) do
+      id when is_integer(id) -> id not in Chat.member_ids(room_id)
+      _ -> false
+    end
+  end
 
   @doc "Adds to a list in a live game (a doodle stroke), without a version check."
   def append(%User{} = user, game_id, key, item) do
