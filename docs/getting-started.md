@@ -96,6 +96,14 @@ Each new person gets a **one-time password**: three words and a number, like
 up). They sign in with it within 7 days and choose their own password. Kids
 can use a grown-up's email with a `+` in it, like `mum+sam@example.com`.
 
+A kid with **no email**, like a young cousin, is added with the Email box left
+empty. They get a **sign-in code** instead, in the same three words and a
+number. On their tablet or phone, open Kitchen Table, press **No email? Sign
+in with a code** and type it in. It works once, within 7 days, and that device
+stays signed in. For another device, or after signing out, an admin or one of
+their guardians makes a new code on their page in Family. Nothing is ever
+emailed for them, and they have no password to forget.
+
 Every ability can be switched on or off for one person from their page, and a
 kid's guardians can set **quiet hours**, such as bedtime or school, when they
 can read but not send.
@@ -192,6 +200,13 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 The app is `android\build\KitchenTable.apk`, if you'd rather copy it over
 yourself.
 
+Downloads, like a photo saved from a chat, go to the tablet's Downloads
+folder, with a notification when each one is done. The app can't show
+Kitchen Table's own notifications, though: Android only gives those to a
+browser. On a phone, use Chrome instead (open the address, then ⋮, **Install
+app**), and switch notifications on under **Me**. In the Android app, Me says
+so and has a button that opens Kitchen Table in Chrome.
+
 ## 6. Email
 
 Without email, invitations and new one-time passwords wait in the app's
@@ -285,7 +300,8 @@ nothing on sends nothing, and quiet hours hold them back until they end.
 
 Notifications need the app online with a proper certificate (see the next
 part). On an iPhone or iPad, add Kitchen Table to the Home Screen first and
-open it from there (iOS 16.4 or later).
+open it from there (iOS 16.4 or later). On Android they need Chrome (or
+another browser), not the Android app from part 5.
 
 They go through each browser's own push service (Google's, Mozilla's,
 Apple's), the standard Web Push way, so there's nothing to sign up for. Each

@@ -262,7 +262,10 @@ function PersonDetail({ person }: { person: Person }) {
   }
 
   async function reset() {
-    if (!(await confirmFirst(`Give ${person.name} a new one-time password?`, 'Give new password', 'Their old password stops working.'))) return;
+    const asked = person.no_email
+      ? await confirmFirst(`Make ${person.name} a new sign-in code?`, 'Make a code', "Any code they haven't used stops working. They stay signed in where they already are.")
+      : await confirmFirst(`Give ${person.name} a new one-time password?`, 'Give new password', 'Their old password stops working.');
+    if (!asked) return;
     try {
       const res = await api.post<{ one_time_password: string }>(`/api/people/${person.id}/reset`);
       setOtp(res.one_time_password);
@@ -296,6 +299,7 @@ function PersonDetail({ person }: { person: Person }) {
             </p>
           )}
           {person.email && <p className="muted">{person.email}</p>}
+          {person.no_email && <p className="muted">No email: signs in with a code</p>}
         </div>
         {person.id !== me.id && person.active && me.permissions.direct_messages && canTalk && (
           <Button variant="primary" icon="chat" onClick={message}>
@@ -313,13 +317,21 @@ function PersonDetail({ person }: { person: Person }) {
         <p className="muted">{asked ? `You've asked to chat with ${person.name}. A guardian from each family needs to say yes.` : whyNot([me, person], facts)}</p>
       )}
 
-      {otp && <OtpCard name={person.name} otp={otp} onDone={() => setOtp(null)} />}
+      {otp && <OtpCard name={person.name} otp={otp} code={!!person.no_email} onDone={() => setOtp(null)} />}
 
       {person.must_change_password && person.active && !otp && (isAdmin || looksAfterKids) && (
         <Notice tone="info">
-          {person.name} hasn't chosen a password yet. Their one-time password{' '}
+          {person.no_email ? `${person.name} hasn't used their sign-in code yet. It` : `${person.name} hasn't chosen a password yet. Their one-time password`}{' '}
           {person.otp_expires_at ? `works until ${new Date(person.otp_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}` : 'is waiting'}.
         </Notice>
+      )}
+
+      {person.no_email && person.active && !otp && looksAfterKids && !isAdmin && (
+        <div className="row">
+          <Button icon="key" onClick={reset}>
+            New sign-in code
+          </Button>
+        </div>
       )}
 
       {person.role === 'kid' && (person.id === me.id || isAdmin || isGuardianOf(me, person)) && <ChatsWith kid={person} />}
@@ -334,18 +346,25 @@ function PersonDetail({ person }: { person: Person }) {
   );
 }
 
-function OtpCard({ name, otp, onDone }: { name: string; otp: string; onDone?: () => void }) {
+function OtpCard({ name, otp, code, onDone }: { name: string; otp: string; code?: boolean; onDone?: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="otp sheet" role="status">
       <p>
-        <strong>{name}'s one-time password</strong>
+        <strong>{code ? `${name}'s sign-in code` : `${name}'s one-time password`}</strong>
       </p>
       <p className="otp-code">{otp}</p>
-      <p className="muted">
-        It's been emailed to them. If the email doesn't arrive, tell them this one-time password and to sign in at {window.location.host}. It works for 7 days, and they'll choose their own
-        password when they sign in.
-      </p>
+      {code ? (
+        <p className="muted">
+          On their tablet or phone, open {window.location.host}, press <strong>No email? Sign in with a code</strong> and type this in. It works once, for 7 days, and
+          they stay signed in on that device. For another device, make a new code.
+        </p>
+      ) : (
+        <p className="muted">
+          It's been emailed to them. If the email doesn't arrive, tell them this one-time password and to sign in at {window.location.host}. It works for 7 days, and they'll choose
+          their own password when they sign in.
+        </p>
+      )}
       <div className="row">
         <Button
           size="sm"
@@ -413,7 +432,9 @@ function AdminDetails({ person, onReset }: { person: Person; onReset: () => void
       <h2>Details</h2>
       <form className="stack" onSubmit={save}>
         <Field label="Name">{(p) => <Input {...p} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} required />}</Field>
-        <Field label="Email">{(p) => <Input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />}</Field>
+        <Field label="Email" hint={role === 'kid' ? 'Leave it empty for a kid with no email: they sign in with a code.' : undefined}>
+          {(p) => <Input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required={role !== 'kid'} />}
+        </Field>
         <RolePicker value={role} onChange={setRole} atHome={atHome} />
         {bubbles.size > 1 && (
           <Field label="Family" hint="Grown-ups are guardians to the kids in their own family, and read the chats those kids are in.">
@@ -445,7 +466,7 @@ function AdminDetails({ person, onReset }: { person: Person; onReset: () => void
       <hr className="rule" />
       <div className="row row-wrap">
         <Button icon="key" onClick={onReset} disabled={!person.active}>
-          New one-time password
+          {person.no_email ? 'New sign-in code' : 'New one-time password'}
         </Button>
         {person.active ? (
           <Button variant="ghost" icon="lock" onClick={() => setActive(false)}>
@@ -622,7 +643,7 @@ function AddPerson({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [colour, setColour] = useState<Colour>('meadow');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ name: string; otp: string } | null>(null);
+  const [done, setDone] = useState<{ name: string; otp: string; code: boolean } | null>(null);
 
   function close() {
     setFamily(null);
@@ -646,7 +667,7 @@ function AddPerson({ open, onClose }: { open: boolean; onClose: () => void }) {
       const where = chosen === 'new' ? { bubble_name: familyName, bubble_emoji: familyEmoji } : chosen ? { bubble_id: chosen } : {};
       const res = await api.post<{ person: Person; one_time_password: string }>('/api/people', { name, email, role, avatar, colour, ...where });
       await refreshPeople();
-      setDone({ name: res.person.name, otp: res.one_time_password });
+      setDone({ name: res.person.name, otp: res.one_time_password, code: !!res.person.no_email });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -668,20 +689,24 @@ function AddPerson({ open, onClose }: { open: boolean; onClose: () => void }) {
           <>
             <Button onClick={close}>Cancel</Button>
             <Button variant="primary" type="submit" form="add-person" busy={busy}>
-              Add and send the invitation
+              {role === 'kid' && !email.trim() ? 'Add and make a sign-in code' : 'Add and send the invitation'}
             </Button>
           </>
         )
       }
     >
       {done ? (
-        <OtpCard name={done.name} otp={done.otp} />
+        <OtpCard name={done.name} otp={done.otp} code={done.code} />
       ) : (
         <form id="add-person" className="stack" onSubmit={submit}>
-          <p className="muted">They'll get an email with a one-time password, and choose their own password when they first sign in.</p>
+          <p className="muted">
+            {role === 'kid' && !email.trim()
+              ? "They'll sign in with a code you give them, typed on their tablet or phone."
+              : "They'll get an email with a one-time password, and choose their own password when they first sign in."}
+          </p>
           <Field label="Name">{(p) => <Input {...p} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} required />}</Field>
-          <Field label="Email" hint="Kids can use a grown-up's email with a + in it, like mum+mia@example.com.">
-            {(p) => <Input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoCapitalize="none" />}
+          <Field label="Email" hint={role === 'kid' ? "Kids don't need one: leave it empty and they sign in with a code." : undefined}>
+            {(p) => <Input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required={role !== 'kid'} autoCapitalize="none" />}
           </Field>
           <RolePicker value={role} onChange={setRole} atHome={atHome} />
           <Field label="Family" hint="Friends, cousins and grandparents come in a family of their own. A grown-up from it goes first, as guardian to its kids.">

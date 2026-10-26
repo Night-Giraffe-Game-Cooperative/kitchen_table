@@ -34,7 +34,9 @@ export interface Person {
   /** Their family bubble: one household. */
   bubble_id: number | null;
   // Present when you may manage this person.
-  email?: string;
+  email?: string | null;
+  /** A kid without an email, who signs in with a code a grown-up makes. */
+  no_email?: boolean;
   must_change_password?: boolean;
   otp_expires_at?: string | null;
   overrides?: Partial<Record<Permission, boolean>>;
@@ -69,7 +71,7 @@ export interface Friendship {
 }
 
 export interface Me extends Person {
-  email: string;
+  email: string | null;
   must_change_password: boolean;
   permissions: Record<Permission, boolean>;
   quiet_hours: QuietHours | null;
@@ -157,6 +159,8 @@ export interface Game<S = Record<string, unknown>> {
   summary: string | null;
   created_by_id: number | null;
   last_move_by_id: number | null;
+  /** The round started from this one with Play again. */
+  next_id?: number | null;
   updated_at: string;
   inserted_at: string;
 }

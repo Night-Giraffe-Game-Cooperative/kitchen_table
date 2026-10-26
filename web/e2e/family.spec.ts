@@ -4,6 +4,7 @@ import path from 'node:path';
 import { startFakeCaldav } from './fixtures/fakeCaldav';
 import { googleClient, microsoftClient, startFakeConnect } from './fixtures/fakeConnect';
 import { startFakePush } from './fixtures/fakePush';
+import { spills, type Spill } from './fixtures/spills';
 
 // One family, start to finish: the first admin sets up, adds a kid and a
 // grown-up, they sign in with one-time passwords, chat, share and doodle on a
@@ -26,9 +27,13 @@ async function open(browser: Browser, size = tablet) {
   return context.newPage();
 }
 
+// Text that runs out of its box, on any screen a shot is taken of.
+const spilt: (Spill & { shot: string })[] = [];
+
 async function shot(page: Page, name: string) {
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(shots, `${name}.png`) });
+  for (const s of await spills(page)) spilt.push({ shot: name, ...s });
 }
 
 async function draw(page: Page, canvas: string, points: [number, number][]) {
@@ -103,7 +108,7 @@ test('a kid signs in with the one-time password and chooses their own', async ({
   await kid.goto('/');
   await kid.getByLabel('Email').fill('alex+mia@example.com');
   await kid.getByLabel('Password').fill(kidOtp);
-  await kid.getByRole('button', { name: 'Sign in' }).click();
+  await kid.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(kid.getByRole('heading', { name: /choose your own password/i })).toBeVisible();
   await shot(kid, '06-phone-change-password');
   await kid.getByLabel('New password', { exact: true }).fill('unicorns are best');
@@ -242,7 +247,11 @@ test('Backgammon: just me against the computer', async () => {
   await admin.getByRole('link', { name: /^Games\b/ }).click();
   await admin.getByRole('button', { name: 'New game' }).click();
   await admin.getByRole('button', { name: /Backgammon/ }).click();
-  await admin.getByRole('radio', { name: 'Just me' }).click();
+  // Who's playing comes first: the family together, just me, or someone else.
+  const who = admin.getByRole('radiogroup', { name: "Who's playing?" });
+  await expect(who.getByRole('radio')).toHaveText([/The family against the computer/, /Just me against the computer/, /Against someone/]);
+  await who.getByRole('radio', { name: /Just me/ }).click();
+  await shot(admin, '16a-whos-playing');
   await admin.getByRole('dialog').getByRole('button', { name: 'Start', exact: true }).click();
   await expect(admin.locator('.game-head')).toContainText('Against the computer');
   await expect(admin.locator('.game-status')).toHaveText('Your turn. Roll the dice!');
@@ -258,6 +267,10 @@ test('Backgammon: just me against the computer', async () => {
   await shot(admin, '17-backgammon');
   await admin.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(admin.locator('.bg-last')).toContainText('computer', { ignoreCase: true, timeout: 15_000 });
+  // Just me means just Alex: it isn't on Mia's list.
+  await kid.goto('/#/games');
+  await expect(kid.locator('.game-item').first()).toBeVisible();
+  await expect(kid.locator('.game-item', { hasText: 'Backgammon' })).toHaveCount(0);
 });
 
 test('age groups and learn mode', async () => {
@@ -348,6 +361,16 @@ test('the newer games: Pairs, Four in a Row, Where\'s the Giraffe?, Dots and Box
   await expect(kid.locator('.game-status')).toContainText('Found by you!');
   await expect(status).toContainText('Found by Mia');
   await shot(kid, '43-phone-giraffe-found');
+  // Mia hides him next, and Alex, still looking, moves on to that round with her.
+  const firstRound = admin.url();
+  await kid.getByRole('button', { name: 'Hide him next' }).click();
+  await expect(kid.locator('.game-status')).toHaveText('Hiding him · your turn');
+  await expect(status).toHaveText('Mia is hiding the Night Giraffe');
+  await expect(admin.getByText('On to the next round, all together.')).toBeVisible();
+  // The last round, opened again, points at this one.
+  await admin.goto(firstRound);
+  await admin.getByRole('button', { name: 'Join the next round' }).click();
+  await expect(status).toHaveText('Mia is hiding the Night Giraffe');
 
   // Dots and Boxes against the computer.
   await newGame(/^Dots and Boxes/);
@@ -385,6 +408,7 @@ test('the newer games: Pairs, Four in a Row, Where\'s the Giraffe?, Dots and Box
   await newGame(/^Snakes and Ladders/);
   await dialog.getByRole('radio', { name: '8–10' }).click();
   await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await expect(admin.getByText('Against the Night Giraffe')).toBeVisible();
   await admin.getByRole('button', { name: /^Roll/ }).click();
   await expect(status).toContainText(/The family rolled a \d/, { timeout: 15_000 });
@@ -397,7 +421,7 @@ test('a grown-up signs in, and the Me page', async ({ browser }) => {
   await mum.goto('/');
   await mum.getByLabel('Email').fill('mum@example.com');
   await mum.getByLabel('Password').fill(mumOtp);
-  await mum.getByRole('button', { name: 'Sign in' }).click();
+  await mum.getByRole('button', { name: 'Sign in', exact: true }).click();
   await mum.getByLabel('New password', { exact: true }).fill('tea and toast please');
   await mum.getByLabel('New password again').fill('tea and toast please');
   await mum.getByRole('button', { name: 'Save my password' }).click();
@@ -470,8 +494,9 @@ test('Word Garden, against each other', async () => {
   await admin.getByRole('button', { name: 'New game' }).click();
   const dialog = admin.getByRole('dialog');
   await dialog.getByRole('button', { name: /Word Garden/ }).click();
-  await dialog.getByRole('radio', { name: 'Against each other' }).click();
+  await dialog.getByRole('radio', { name: /Against each other/ }).click();
   await dialog.getByRole('button', { name: /Mia/ }).click();
+  await expect(dialog.locator('.vs-pick .field-hint')).toHaveText(/your chat with them|starts a chat for you and Mia/);
   await dialog.getByRole('radio', { name: 'One each' }).click();
   await dialog.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(admin.getByText('Your turn: pick a letter')).toBeVisible();
@@ -596,7 +621,7 @@ test('another family: the home family chooses what they can use, and they are ne
   await sam.goto('/');
   await sam.getByLabel('Email').fill('sam@example.com');
   await sam.getByLabel('Password').fill(samOtp);
-  await sam.getByRole('button', { name: 'Sign in' }).click();
+  await sam.getByRole('button', { name: 'Sign in', exact: true }).click();
   await sam.getByLabel('New password', { exact: true }).fill('the smiths say hello');
   await sam.getByLabel('New password again').fill('the smiths say hello');
   await sam.getByRole('button', { name: 'Save my password' }).click();
@@ -660,7 +685,7 @@ test('friends from another family: a guardian from each says yes, and family fro
   await sam.goto('/');
   await sam.getByLabel('Email').fill('sam@example.com');
   await sam.getByLabel('Password').fill('the smiths say hello');
-  await sam.getByRole('button', { name: 'Sign in' }).click();
+  await sam.getByRole('button', { name: 'Sign in', exact: true }).click();
   await sam.getByRole('link', { name: /^Family\b/ }).click();
   await expect(sam.locator('.waiting')).toContainText('Can Ollie chat with Mia');
   await expect(sam.locator('.waiting')).toContainText('said yes.');
@@ -1006,7 +1031,7 @@ test('notifications: on for a phone, a message pops up while the app is closed, 
     await mum.goto('/');
     await mum.getByLabel('Email').fill('mum@example.com');
     await mum.getByLabel('Password').fill('tea and toast please');
-    await mum.getByRole('button', { name: 'Sign in' }).click();
+    await mum.getByRole('button', { name: 'Sign in', exact: true }).click();
     await mum.getByRole('link', { name: /^Me\b/ }).click();
     await mum.getByRole('switch', { name: 'On this device' }).click();
     await expect(mum.getByText('Notifications are on for this device.')).toBeVisible();
@@ -1109,7 +1134,7 @@ test('your things: downloads, and accounts deleted for good', async ({ browser }
   await mum.goto('/');
   await mum.getByLabel('Email').fill('mum@example.com');
   await mum.getByLabel('Password').fill('tea and toast please');
-  await mum.getByRole('button', { name: 'Sign in' }).click();
+  await mum.getByRole('button', { name: 'Sign in', exact: true }).click();
   await mum.getByRole('link', { name: /^Me\b/ }).click();
   const [mine] = await Promise.all([mum.waitForEvent('download'), mum.getByRole('link', { name: 'Download my things' }).click()]);
   expect(mine.suggestedFilename()).toMatch(/^kitchen-table-mum-/);
@@ -1122,9 +1147,47 @@ test('your things: downloads, and accounts deleted for good', async ({ browser }
   await shot(mum, '40-delete-me');
   await confirm.getByLabel('Your password').fill('tea and toast please');
   await confirm.getByRole('button', { name: 'Delete for good' }).click();
-  await expect(mum.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  await expect(mum.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   await mum.context().close();
   await admin.reload();
   await expect(admin.getByRole('link', { name: /Mum/ })).toHaveCount(0);
 });
 
+test('a kid with no email signs in with a code a grown-up makes', async ({ browser }) => {
+  const dialog = admin.getByRole('dialog');
+  await admin.getByRole('link', { name: /^Family\b/ }).click();
+  await admin.getByRole('button', { name: 'Add someone' }).click();
+  await dialog.getByLabel('Name').fill('Robin');
+  await dialog.getByRole('radio', { name: 'Kid' }).click();
+  await expect(dialog).toContainText('sign in with a code');
+  await dialog.getByRole('button', { name: 'Add and make a sign-in code' }).click();
+  await expect(dialog).toContainText("Robin's sign-in code");
+  const code = (await dialog.locator('.otp-code').textContent())!.trim();
+  await shot(admin, '60-sign-in-code');
+  await dialog.getByRole('button', { name: 'Done' }).first().click();
+
+  // On Robin's tablet: the code, typed with spaces the way a kid might.
+  const robin = await open(browser);
+  await robin.goto('/');
+  await robin.getByRole('button', { name: 'No email? Sign in with a code' }).click();
+  await robin.getByLabel('Code').fill(code.replaceAll('-', ' '));
+  await shot(robin, '61-tablet-code-sign-in');
+  await robin.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(robin.getByRole('heading', { name: 'Chats', exact: true })).toBeVisible();
+  await robin.getByRole('link', { name: /^Me\b/ }).click();
+  await expect(robin.getByRole('heading', { name: 'Password' })).toHaveCount(0);
+  await robin.context().close();
+
+  // The code worked once; a new one is made on Robin's page.
+  await admin.getByRole('link', { name: /Robin/ }).click();
+  await expect(admin.getByText('No email: signs in with a code')).toBeVisible();
+  await admin.getByRole('button', { name: 'New sign-in code' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Make a code' }).click();
+  await expect(admin.locator('.otp-code')).not.toHaveText(code);
+});
+
+test('no text runs out of its box on any screen', async () => {
+  await fs.mkdir(path.join(import.meta.dirname, '..', 'test-results'), { recursive: true });
+  await fs.writeFile(path.join(import.meta.dirname, '..', 'test-results', 'spills.json'), JSON.stringify(spilt, null, 2));
+  expect(spilt).toEqual([]);
+});

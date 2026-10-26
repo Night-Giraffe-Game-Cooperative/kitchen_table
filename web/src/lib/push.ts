@@ -27,6 +27,15 @@ function installed(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
+/**
+ * The Kitchen Table Android app (android/), as a version like 1.1, when this
+ * page is inside it. It can't show notifications: only a browser can.
+ */
+export function androidApp(): number | null {
+  const m = navigator.userAgent.match(/KitchenTableApp\/(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
+}
+
 export function pushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }

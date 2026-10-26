@@ -11,7 +11,7 @@ import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../co
 import { joinSeat, nameOf, startGame } from '../common';
 import { bandOf, type Band } from '../bands';
 import { HINT, TipNote, useLearn, useTips } from '../learn';
-import { OpponentSelect, WhoPlays, whoHint, type Who } from '../opponents';
+import type { Who } from '../opponents';
 import { defaultPlayers } from '../word-garden/Players';
 import { chooseColumn, type Level } from './ai';
 import { TIPS, fourBasics, fourGuide, hintFor, threatTips, turnTip } from './learn';
@@ -228,7 +228,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
     setAgain(true);
     try {
       const state = opening(swapped, coop ? (s.level ?? levelFor[band]) : undefined);
-      await startGame(game.room_id, TYPE, { mode: game.mode, seats: swapped, state: { ...state, band }, ...(game.title ? { title: game.title } : {}) });
+      await startGame(game, TYPE, { mode: game.mode, seats: swapped, state: { ...state, band }, ...(game.title ? { title: game.title } : {}) });
     } catch (e) {
       toast((e as Error).message, 'danger');
     } finally {
@@ -445,25 +445,13 @@ function Board({ game, play, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange, mode, band, room, me, people }: OptionsProps<Options>) {
+// Who plays is chosen first, in New game.
+function Options({ value, onChange, mode, people }: OptionsProps<Options>) {
   const coop = mode === 'coop';
   const team = coop && value.who === 'team';
   const opponent = typeof value.opponent === 'number' ? people.get(value.opponent)?.name : undefined;
-  const help =
-    band === '5-7'
-      ? 'Stars and warning signs show where four could be made next go.'
-      : band === '8-10'
-        ? 'Ask for a hint or take a move back whenever you like.'
-        : band === '11-13'
-          ? 'Take a move back whenever you like. Hints come with learn mode.'
-          : 'Take a move back whenever you like.';
   return (
     <>
-      {coop ? (
-        <WhoPlays value={value.who} onChange={(who) => onChange({ ...value, who })} hint={`${whoHint(value.who)} ${help}`} />
-      ) : (
-        <OpponentSelect value={value.opponent} onChange={(o) => onChange({ ...value, opponent: o })} room={room} me={me} people={people} />
-      )}
       <div className="field">
         <span className="field-label">Who goes first</span>
         <Segmented
@@ -491,6 +479,8 @@ export const fourInARow: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 players',
+  against: 'the computer',
+  most: 2,
   defaults: ({ me, room }) => ({ who: 'team', opponent: defaultPlayers(room, me)[0] ?? 'open', first: 'me' }),
   ready: () => true,
   Options,

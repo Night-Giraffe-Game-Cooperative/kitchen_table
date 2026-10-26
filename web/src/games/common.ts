@@ -63,6 +63,14 @@ export interface GameDef<S = any, O = any> {
   modeLabels?: Partial<Record<Mode, string>>;
   modeIcons?: Partial<Record<Mode, IconName>>;
   players: string;
+  /**
+   * Who co-op plays against, like "the computer", when it isn't everyone
+   * together. Then co-op is played by one person or the whole chat, and the
+   * options' `who` says which ('me' or 'team').
+   */
+  against?: string;
+  /** Most players against each other, you included. Their ids come in the options' `players`, and the first in `opponent`. */
+  most?: number;
   defaults: (ctx: { me: Me; room: Room; mode: Mode; band: Band }) => O;
   Options?: ComponentType<OptionsProps<O>>;
   /** May be async, e.g. to upload a photo or let the computer move first. The band is added to the state afterwards. */
@@ -161,8 +169,16 @@ export function pick<T>(xs: T[], random = Math.random): T {
   return xs[Math.floor(random() * xs.length)];
 }
 
-/** Starts a new game in a room and opens it, for "play again" buttons. */
-export async function startGame(roomId: number, type: string, made: NewGame) {
-  const res = await api.post<{ game: { id: number } }>(`/api/rooms/${roomId}/games`, { type, ...made });
+/** Games this device pressed Play again on, so it doesn't announce its own next round. */
+export const startedHere = new Set<number>();
+
+/**
+ * Starts the next round after a game and opens it, for "play again" buttons.
+ * Everyone else looking at the last game moves on to it too, and if someone
+ * else got there first, this opens theirs.
+ */
+export async function startGame(last: { id: number; room_id: number }, type: string, made: NewGame) {
+  startedHere.add(last.id);
+  const res = await api.post<{ game: { id: number } }>(`/api/rooms/${last.room_id}/games`, { type, ...made, after: last.id });
   go({ name: 'games', gameId: res.game.id });
 }

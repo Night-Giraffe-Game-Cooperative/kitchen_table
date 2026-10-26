@@ -1,97 +1,16 @@
 // Shared pieces for the versus modes of Word Garden, Picture Puzzle and Story
-// Chain: choosing who plays, showing the players, joining an open place, and
-// the final standings.
+// Chain: showing the players, joining an open place, and the final standings.
+// Who plays is chosen in New game.
 import { useState, type ReactNode } from 'react';
 import { Avatar, Button } from '../../components/ui';
 import { useStore } from '../../lib/store';
 import type { Game, Me, Person, Room, Seat } from '../../lib/types';
 import { joinSeat, listNames, nameOf, seatOrder, type PlayerSeat } from '../common';
 
-/** People in the room who could be asked to play, not counting me. */
-export function otherPlayers(room: Room, me: Me, people: Map<number, Person>): number[] {
-  return room.member_ids.filter((id) => {
-    const p = people.get(id);
-    return id !== me.id && p && p.active !== false && p.permissions?.play_games !== false;
-  });
-}
-
 /** The other person in a chat for two; otherwise a place for whoever wants it. */
 export function defaultPlayers(room: Room, me: Me): PlayerSeat[] {
   const others = room.member_ids.filter((id) => id !== me.id);
   return others.length === 1 ? [others[0]] : ['open'];
-}
-
-export function PlayerPicker({
-  value,
-  onChange,
-  room,
-  me,
-  people,
-  max,
-  race,
-}: {
-  value: PlayerSeat[];
-  onChange: (v: PlayerSeat[]) => void;
-  room: Room;
-  me: Me;
-  people: Map<number, Person>;
-  /** Most players, me included. */
-  max: number;
-  /** Everyone plays at once, so there's no turn order to explain. */
-  race?: boolean;
-}) {
-  const others = otherPlayers(room, me, people);
-  const full = value.length + 1 >= max;
-
-  function toggle(p: PlayerSeat) {
-    const next = value.includes(p) ? value.filter((x) => x !== p) : [...value, p];
-    // People who are already in go first, so the game doesn't start by waiting for someone to join.
-    onChange([...next.filter((x) => x !== 'open'), ...next.filter((x) => x === 'open')]);
-  }
-
-  const names = ['You', ...value.filter((p) => p !== 'open').map((id) => nameOf(people, id))];
-  const order = value.includes('open') ? [...names, 'whoever joins'] : names;
-
-  return (
-    <fieldset className="fieldset vs-pick">
-      <legend>Who's playing?</legend>
-      <div className="vs-chips">
-        <span className={`vs-chip tint-${me.colour}`} aria-pressed="true" data-fixed>
-          <Avatar person={me} size="xs" />
-          <span>You</span>
-        </span>
-        {others.map((id) => {
-          const on = value.includes(id);
-          return (
-            <button key={id} type="button" className={`vs-chip tint-${people.get(id)?.colour ?? 'slate'}`} aria-pressed={on} disabled={!on && full} onClick={() => toggle(id)}>
-              <Avatar person={people.get(id)} size="xs" />
-              <span>{people.get(id)?.name}</span>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          className="vs-chip vs-chip-open"
-          aria-pressed={value.includes('open')}
-          disabled={!value.includes('open') && full}
-          onClick={() => toggle('open')}
-        >
-          <span className="vs-open-face" aria-hidden="true">
-            +
-          </span>
-          <span>Anyone who wants to</span>
-        </button>
-      </div>
-      <p className="field-hint vs-pick-hint">
-        {value.length === 0
-          ? 'Choose at least one person to play against.'
-          : race
-            ? `${listNames(order)} get the same puzzle.`
-            : `Turns go ${order.join(', then ')}, and round again.`}
-        {full && ` ${max} players at most.`}
-      </p>
-    </fieldset>
-  );
 }
 
 /** The players in a row, with whose turn it is and something about each. */

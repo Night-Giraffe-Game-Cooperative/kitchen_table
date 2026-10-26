@@ -32,9 +32,23 @@ defmodule Family.Accounts.User do
   def roles, do: @roles
   def colours, do: @colours
 
+  # A kid without an email of their own signs in with a code a grown-up makes.
+  # Their account keeps a stand-in address nobody can send to or guess.
+  @no_email "@kids.invalid"
+
+  def no_email?(%__MODULE__{email: email}), do: no_email?(email)
+  def no_email?(email) when is_binary(email), do: String.ends_with?(email, @no_email)
+  def no_email?(_), do: false
+
+  @doc "Their email, or nil for a kid who has none."
+  def email(%__MODULE__{email: email} = user), do: if(no_email?(user), do: nil, else: email)
+
+  defp stand_in, do: "kid-" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower) <> @no_email
+
   def invite_changeset(user, attrs) do
     user
     |> cast(attrs, [:name, :email, :role, :colour, :avatar])
+    |> kids_need_no_email()
     |> normalise_email()
     |> validate_required([:name, :email, :role])
     |> validate_profile()
@@ -54,6 +68,7 @@ defmodule Family.Accounts.User do
   def admin_changeset(user, attrs) do
     user
     |> cast(attrs, [:name, :email, :role, :colour, :avatar, :active])
+    |> kids_need_no_email()
     |> normalise_email()
     |> validate_required([:name, :email, :role])
     |> validate_profile()
@@ -68,6 +83,25 @@ defmodule Family.Accounts.User do
     |> validate_length(:name, max: 40, message: "needs to be 40 characters or fewer")
     |> validate_inclusion(:colour, @colours)
     |> validate_length(:avatar, min: 1, max: 16)
+  end
+
+  defp kids_need_no_email(changeset) do
+    changeset =
+      # Saving a kid's details with the email left empty keeps their stand-in.
+      if Map.has_key?(changeset.changes, :email) and is_nil(changeset.changes.email) and no_email?(changeset.data),
+        do: delete_change(changeset, :email),
+        else: changeset
+
+    cond do
+      get_field(changeset, :role) == "kid" and is_nil(get_field(changeset, :email)) ->
+        put_change(changeset, :email, stand_in())
+
+      get_field(changeset, :role) != "kid" and no_email?(get_field(changeset, :email)) ->
+        add_error(changeset, :email, "is needed for a grown-up")
+
+      true ->
+        changeset
+    end
   end
 
   defp normalise_email(changeset) do

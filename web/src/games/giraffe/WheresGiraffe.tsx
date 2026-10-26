@@ -160,7 +160,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
   async function hideAgain() {
     setAgain(true);
     try {
-      await startGame(game.room_id, TYPE, { mode: 'coop', seats: { hider: me.id }, state: fresh(s.media, s.band) });
+      await startGame(game, TYPE, { mode: 'coop', seats: { hider: me.id }, state: fresh(s.media, s.band) });
     } finally {
       setAgain(false);
     }

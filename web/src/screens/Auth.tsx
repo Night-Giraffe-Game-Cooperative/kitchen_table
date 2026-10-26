@@ -94,6 +94,7 @@ export function Setup({ appName, needsCode, onDone }: { appName: string; needsCo
 }
 
 export function SignIn({ appName, onDone }: { appName: string; onDone: (password: string) => void }) {
+  const [withCode, setWithCode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,8 @@ export function SignIn({ appName, onDone }: { appName: string; onDone: (password
       setBusy(false);
     }
   }
+
+  if (withCode) return <CodeSignIn appName={appName} onBack={() => setWithCode(false)} onDone={() => onDone('')} />;
 
   return (
     <AuthLayout appName={appName}>
@@ -148,6 +151,59 @@ export function SignIn({ appName, onDone }: { appName: string; onDone: (password
         </Button>
       </form>
       <p className="auth-foot">Forgotten your password? Ask a family admin for a new one-time password.</p>
+      <Button variant="ghost" icon="key" wide onClick={() => setWithCode(true)}>
+        No email? Sign in with a code
+      </Button>
+    </AuthLayout>
+  );
+}
+
+/** Kids without an email sign in with a code a grown-up made for them, once per device. */
+function CodeSignIn({ appName, onBack, onDone }: { appName: string; onBack: () => void; onDone: () => void }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post<{ me: Me }>('/api/session/code', { code });
+      onDone();
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthLayout appName={appName}>
+      <h1>Sign in with a code</h1>
+      <form onSubmit={submit} className="stack">
+        <p className="muted">A grown-up makes the code on your page in Family. It looks like otter-maple-drum-42.</p>
+        <Field label="Code">
+          {(p) => (
+            <Input
+              {...p}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+            />
+          )}
+        </Field>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" variant="primary" size="lg" wide busy={busy}>
+          Sign in
+        </Button>
+      </form>
+      <Button variant="ghost" icon="back" wide onClick={onBack}>
+        Sign in with an email
+      </Button>
     </AuthLayout>
   );
 }

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { api } from '../../lib/api';
 import { confirmFirst } from '../../components/confirm';
 import { useStore } from '../../lib/store';
-import { Avatar, Button, Field, Segmented, Select } from '../../components/ui';
+import { Avatar, Button } from '../../components/ui';
 import type { Game } from '../../lib/types';
-import type { GameDef, GameProps, OptionsProps, Update } from '../common';
+import type { GameDef, GameProps, Update } from '../common';
 import { nameOf } from '../common';
 import { chooseSequence, type Level } from './ai';
 import { TipNote, useLearn, useTips } from '../learn';
@@ -488,41 +488,6 @@ function Die({ value, x, used }: { value: number; x: number; used: boolean }) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
-  const others = room.member_ids.filter((id) => id !== me.id && people.get(id)?.active);
-  return mode === 'coop' ? (
-    <>
-      <div className="field">
-        <span className="field-label">Who plays the computer</span>
-        <Segmented
-          label="Who plays the computer"
-          value={value.who}
-          onChange={(who) => onChange({ ...value, who })}
-          options={[
-            { value: 'team', label: 'Everyone in the chat', icon: 'team' },
-            { value: 'me', label: 'Just me', icon: 'me' },
-          ]}
-        />
-        <p className="field-hint">
-          {value.who === 'team' ? 'The family plays white, and anyone in the chat can roll and move for the family.' : 'You play white, and the others can watch.'}
-        </p>
-      </div>
-    </>
-  ) : (
-    <Field label="Playing against">
-      {(p) => (
-        <Select {...p} value={String(value.opponent)} onChange={(e) => onChange({ ...value, opponent: e.target.value === 'open' ? 'open' : Number(e.target.value) })}>
-          <option value="open">Whoever wants to play</option>
-          {others.map((id) => (
-            <option key={id} value={id}>
-              {people.get(id)?.name}
-            </option>
-          ))}
-        </Select>
-      )}
-    </Field>
-  );
-}
 
 export const backgammon: GameDef<State, Options> = {
   type: 'backgammon',
@@ -533,8 +498,10 @@ export const backgammon: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 players',
+  against: 'the computer',
+  most: 2,
+  // Who plays is chosen in New game, and there's nothing else to choose.
   defaults: () => ({ opponent: 'open', who: 'team' }),
-  Options,
   create: (o, { me, mode, band }) =>
     mode === 'coop'
       ? {

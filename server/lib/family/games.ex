@@ -7,6 +7,9 @@ defmodule Family.Games do
   Each game's state is a map with a `turn` naming the seat to move next, or
   `"anyone"` when everyone can move at once. Seats hold a person's id, `team`
   (anyone in the room), `computer`, or `open` (waiting for someone to join).
+
+  Play again starts a new game `after` the last one. The last one points at
+  it (`next_id`), so everyone looking at it moves on to the same round.
   """
 
   import Ecto.Query
@@ -64,19 +67,57 @@ defmodule Family.Games do
     end
   end
 
-  @doc "Games in the rooms someone is in: everything active, and the latest finished, less any they took off their list."
+  # Finished games stay on the list only when they made something to keep,
+  # a picture or a story. The rest go once they're over.
+  @keeps ~w(doodle_together doodle_telephone doodle_duel story_chain)
+
+  @doc "Whether a finished game of this type stays on the Games list."
+  def keeps?(type), do: type in @keeps
+
+  @doc "Games in the rooms someone is in: everything active, and the latest finished pictures and stories, less any they took off their list."
   def list_for(%User{} = user) do
     rooms = from m in Chat.Member, where: m.user_id == ^user.id, select: m.room_id
     hidden = from h in "hidden_games", where: h.user_id == ^user.id, select: h.game_id
     mine = from g in Game, where: g.room_id in subquery(rooms) and g.id not in subquery(hidden)
 
     active = from(g in mine, where: g.status == "active", order_by: [desc: g.updated_at]) |> Repo.all()
-    finished = from(g in mine, where: g.status == "finished", order_by: [desc: g.updated_at], limit: 12) |> Repo.all()
+    finished = from(g in mine, where: g.status == "finished" and g.type in @keeps, order_by: [desc: g.updated_at], limit: 12) |> Repo.all()
 
-    Enum.map(active ++ finished, &Present.game/1)
+    (active ++ finished)
+    |> Enum.reject(&someone_elses_solo?(&1, user))
+    |> Enum.map(&Present.game/1)
   end
 
-  def create(%User{} = user, room_id, attrs) do
+  # One person against the computer is theirs alone, so it isn't on anyone else's list.
+  defp someone_elses_solo?(%Game{seats: seats}, %User{id: id}) do
+    holders = Map.values(seats || %{})
+    "computer" in holders and Enum.count(holders, &is_integer/1) == 1 and id not in holders
+  end
+
+  def create(%User{} = user, room_id, %{"after" => after_id} = attrs) when not is_nil(after_id) do
+    Referee.run(fn ->
+      with %Game{room_id: ^room_id} = last <- get_for(user, to_int(after_id)) || {:error, :not_found} do
+        case last.next_id && Repo.get(Game, last.next_id) do
+          # Someone else pressed Play again first: everyone goes to theirs.
+          %Game{status: "active"} = next ->
+            {:ok, next}
+
+          _ ->
+            with {:ok, next} <- create(user, room_id, Map.delete(attrs, "after"), last) do
+              last |> Ecto.Changeset.change(next_id: next.id) |> Repo.update!() |> announce()
+              {:ok, next}
+            end
+        end
+      else
+        %Game{} -> {:error, :not_found}
+        error -> error
+      end
+    end)
+  end
+
+  def create(user, room_id, attrs), do: create(user, room_id, attrs, nil)
+
+  defp create(%User{} = user, room_id, attrs, last) do
     type = attrs["type"]
     mode = attrs["mode"]
     seats = attrs["seats"] || %{}
@@ -102,7 +143,7 @@ defmodule Family.Games do
       # Games keep out of the chat itself: it shows the games going on in it
       # above the messages, and the people asked to play hear about it.
       announce(game)
-      Family.Push.game_started(game)
+      Family.Push.game_started(game, last)
       {:ok, game}
     end
   end
@@ -257,6 +298,9 @@ defmodule Family.Games do
       end
     end)
   end
+
+  defp to_int(id) when is_integer(id), do: id
+  defp to_int(id) when is_binary(id), do: String.to_integer(id)
 
   defp may_play(user, room_id, permission) do
     cond do

@@ -142,7 +142,8 @@ defmodule Family.Accounts do
             Chat.notify_members(room.id, "rooms_changed", %{})
           end
 
-          send_invitation(admin, user, otp)
+          # A kid without an email gets their code from a grown-up instead.
+          unless User.no_email?(user), do: send_invitation(admin, user, otp)
           broadcast_person(user)
           user
         else
@@ -156,9 +157,12 @@ defmodule Family.Accounts do
     end
   end
 
-  @doc "Gives someone a new one-time password, for a forgotten password."
+  @doc """
+  Gives someone a new one-time password, for a forgotten password. For a kid
+  without an email it's a new sign-in code, which their guardians can make too.
+  """
   def reset_password(%User{} = admin, %User{} = user) do
-    with :ok <- authorise(admin, :manage_people) do
+    with :ok <- if(User.no_email?(user) and looks_after?(admin, user), do: :ok, else: authorise(admin, :manage_people)) do
       otp = OneTimePassword.generate()
 
       {:ok, user} =
@@ -170,8 +174,12 @@ defmodule Family.Accounts do
         )
         |> Repo.update()
 
-      delete_tokens(user)
-      send_reset(admin, user, otp)
+      # A new code for a kid without an email is for another device, so they
+      # stay signed in on theirs; a new password signs everyone else out.
+      unless User.no_email?(user) do
+        delete_tokens(user)
+        send_reset(admin, user, otp)
+      end
       {:ok, user, otp}
     end
   end
@@ -316,6 +324,36 @@ defmodule Family.Accounts do
 
       true ->
         {:ok, user}
+    end
+  end
+
+  @doc """
+  Signs a kid without an email in with the code a grown-up made for them.
+  Dashes or spaces between the words both do. The code works once: after it,
+  this device stays signed in, and another device needs a new code.
+  """
+  def authenticate_code(code) do
+    code = code |> to_string() |> String.downcase() |> String.split(~r/[^a-z0-9]+/, trim: true) |> Enum.join("-")
+    now = DateTime.utc_now()
+
+    waiting =
+      from(u in User, where: u.active and u.must_change_password and like(u.email, "%@kids.invalid") and u.otp_expires_at > ^now)
+      |> Repo.all()
+
+    case code != "" && Enum.find(waiting, &Passwords.verify(code, &1.password_hash)) do
+      %User{} = user ->
+        # Nothing signs in as them again until a grown-up makes a new code.
+        user
+        |> Ecto.Changeset.change(
+          password_hash: Passwords.hash(Base.encode64(:crypto.strong_rand_bytes(24))),
+          must_change_password: false,
+          otp_expires_at: nil
+        )
+        |> Repo.update()
+
+      _ ->
+        Passwords.no_user_verify()
+        {:error, :invalid}
     end
   end
 

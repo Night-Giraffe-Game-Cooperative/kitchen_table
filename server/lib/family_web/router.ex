@@ -25,6 +25,7 @@ defmodule FamilyWeb.Router do
     get "/setup", SessionController, :setup_status
     post "/setup", SessionController, :setup
     post "/session", SessionController, :create
+    post "/session/code", SessionController, :code
     delete "/session", SessionController, :delete
 
     scope "/" do

@@ -11,7 +11,7 @@ import { listNames, nameOf, nextSeat, playerSeats, seatOf, seatOrder, startGame 
 import { bandOf, type Band } from '../bands';
 import { pictureOf, useChatPhotos } from '../photos';
 import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
-import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers, winnerText } from '../word-garden/Players';
+import { JoinBanner, SeatList, Standings, defaultPlayers, winnerText } from '../word-garden/Players';
 import {
   PAIRS,
   coopSummary,
@@ -209,7 +209,7 @@ function Board({ game, play, me, people }: GameProps<PairsState>) {
     setAgain(true);
     try {
       if (!versus) {
-        await startGame(game.room_id, 'pairs', { mode: 'coop', seats: {}, state: newGame({ set: s.set, band, photos: s.photos }) });
+        await startGame(game, 'pairs', { mode: 'coop', seats: {}, state: newGame({ set: s.set, band, photos: s.photos }) });
         return;
       }
       // The same players, and the next game opens with the next player.
@@ -217,7 +217,7 @@ function Board({ game, play, me, people }: GameProps<PairsState>) {
       const turned = [...players.slice(1), ...players.slice(0, 1)];
       if (turned.length < 2) turned.push('open');
       const seats = playerSeats(turned);
-      await startGame(game.room_id, 'pairs', { mode: 'versus', seats, state: newGame({ set: s.set, band, photos: s.photos, order: seatOrder(seats) }) });
+      await startGame(game, 'pairs', { mode: 'versus', seats, state: newGame({ set: s.set, band, photos: s.photos, order: seatOrder(seats) }) });
     } finally {
       setAgain(false);
     }
@@ -371,7 +371,7 @@ function Board({ game, play, me, people }: GameProps<PairsState>) {
   );
 }
 
-function Options({ value, onChange, mode, band, room, me, people }: OptionsProps<Options>) {
+function Options({ value, onChange, mode, band, room }: OptionsProps<Options>) {
   const photos = useChatPhotos(room.id, 12);
   const need = PAIRS[band];
 
@@ -397,7 +397,6 @@ function Options({ value, onChange, mode, band, room, me, people }: OptionsProps
           <p className="vs-rules">
             Take turns to turn over two cards. Find a pair and it's yours, and you go again. Miss, and it's the next player's turn. Most pairs wins!
           </p>
-          <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={6} />
         </>
       )}
       <div className="field">
@@ -433,6 +432,7 @@ export const pairs: GameDef<PairsState, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Taking turns' },
   players: 'Any number together, or 2 to 6 taking turns',
+  most: 6,
   defaults: ({ me, room, mode }) => ({ mode, pictures: 'photos', photos: null, players: defaultPlayers(room, me) }),
   ready: (o) => (o.mode !== 'versus' || o.players.length > 0) && (o.pictures !== 'photos' || o.photos !== null),
   Options,

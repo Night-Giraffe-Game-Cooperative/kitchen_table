@@ -59,6 +59,23 @@ defmodule FamilyWeb.SessionController do
 
   def create(conn, _), do: conn |> put_status(422) |> json(%{error: "Enter your email and password."})
 
+  @doc "A kid without an email signs in with the code a grown-up made for them."
+  def code(conn, params) do
+    with :ok <- RateLimit.hit({:code, ip(conn)}, 10, :timer.minutes(10)) do
+      case Accounts.authenticate_code(params["code"]) do
+        {:ok, user} ->
+          Accounts.mark_seen(user)
+          conn |> Auth.sign_in(user) |> json(%{me: Present.me(user)})
+
+        {:error, _} ->
+          conn |> put_status(401) |> json(%{error: "That code isn't right, or it has run out. Ask a grown-up for a new one."})
+      end
+    else
+      {:error, :rate_limited} ->
+        conn |> put_status(429) |> json(%{error: "Too many tries. Wait ten minutes and try again."})
+    end
+  end
+
   def delete(conn, _), do: conn |> Auth.sign_out() |> json(%{ok: true})
 
   defp app_name, do: Application.get_env(:family, :app_name)

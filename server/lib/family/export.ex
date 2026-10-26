@@ -63,7 +63,7 @@ defmodule Family.Export do
 
     me = %{
       name: user.name,
-      email: user.email,
+      email: Family.Accounts.User.email(user),
       role: user.role,
       family: user.bubble && user.bubble.name,
       colour: user.colour,
@@ -121,7 +121,7 @@ defmodule Family.Export do
       |> Enum.map(
         &%{
           name: &1.name,
-          email: &1.email,
+          email: Family.Accounts.User.email(&1),
           role: &1.role,
           family: &1.bubble && &1.bubble.name,
           switched_on: &1.active,

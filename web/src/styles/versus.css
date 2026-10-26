@@ -40,14 +40,16 @@
     background-color var(--motion-fast) var(--ease);
 }
 
-.vs-chip[aria-pressed='true'] {
+.vs-chip[aria-pressed='true'],
+.vs-chip[aria-checked='true'] {
   background: var(--tint);
   border-color: var(--ink-c);
   box-shadow: inset 0 0 0 1px var(--ink-c);
   transform: translateY(2px);
 }
 
-.vs-chip[aria-pressed='true']::after {
+.vs-chip[aria-pressed='true']::after,
+.vs-chip[aria-checked='true']::after {
   content: '✓';
   color: var(--ink-c);
   font-weight: 800;
@@ -67,6 +69,60 @@
   border-style: dashed;
   --tint: var(--sunken);
   --ink-c: var(--ink);
+}
+
+/* A chat to play in: its emoji, then "You and Mia" or the chat's name. */
+.vs-chip-chat {
+  --tint: var(--sunken);
+  --ink-c: var(--ink);
+  padding-left: 0.8rem;
+}
+
+/* Who's playing: just me, together, or against someone. */
+.who-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.5rem;
+}
+
+.who-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  text-align: left;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-press-soft);
+  margin-bottom: 2px;
+}
+
+.who-pick[aria-checked='true'] {
+  background: var(--sunken);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  transform: translateY(2px);
+}
+
+.who-pick-art {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.who-pick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.who-pick-text strong {
+  font-size: var(--text-base);
 }
 
 .vs-open-face {

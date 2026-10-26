@@ -10,8 +10,8 @@ import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../co
 import { nameOf, nextSeat, placings, playerSeats, seatOrder, startGame } from '../common';
 import { bandOf, step } from '../bands';
 import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
-import { WhoPlays, whoHint, type Who } from '../opponents';
-import { JoinBanner, PlayerPicker, defaultPlayers, winnerText } from '../word-garden/Players';
+import type { Who } from '../opponents';
+import { JoinBanner, defaultPlayers, winnerText } from '../word-garden/Players';
 import { anySafeLine, computerTurn, giveaway, levelFor, levelName } from './ai';
 import {
   boxesBeside,
@@ -277,7 +277,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
         next = playerSeats(order.some((k) => seats[k] === 'open') ? [...turned, 'open'] : turned);
       }
       const state = newBoard(n, { ...(s.level ? { level: s.level } : {}), ...(s.band ? { band: s.band } : {}) });
-      await startGame(game.room_id, TYPE, { mode: game.mode, seats: next, state, ...(game.title ? { title: game.title } : {}) });
+      await startGame(game, TYPE, { mode: game.mode, seats: next, state, ...(game.title ? { title: game.title } : {}) });
     } finally {
       setAgain(false);
     }
@@ -482,24 +482,13 @@ function Results({ game, me, people, colours, scores }: ScoreProps) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
-  if (mode === 'coop') {
-    return (
-      <WhoPlays
-        value={value.who}
-        onChange={(who) => onChange({ ...value, who })}
-        hint={`${whoHint(value.who)} ${value.who === 'team' ? 'The family goes first.' : 'You go first.'}`}
-      />
-    );
-  }
+// Who plays is chosen first, in New game.
+function Options({ value, mode }: OptionsProps<Options>) {
+  if (mode === 'coop') return <p className="vs-rules">{value.who === 'team' ? 'The family goes first.' : 'You go first.'}</p>;
   return (
-    <>
-      <p className="vs-rules">
-        Take turns drawing a line between two dots. Draw the fourth side of a box to make it yours, and go again. When every line is drawn, most boxes
-        wins!
-      </p>
-      <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={4} />
-    </>
+    <p className="vs-rules">
+      Take turns drawing a line between two dots. Draw the fourth side of a box to make it yours, and go again. When every line is drawn, most boxes wins!
+    </p>
   );
 }
 
@@ -521,6 +510,8 @@ export const dotsAndBoxes: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 to 4 players',
+  against: 'the computer',
+  most: 4,
   defaults: ({ me, room, mode }) => ({ mode, who: 'team', players: defaultPlayers(room, me) }),
   ready: (o) => o.mode !== 'versus' || o.players.length > 0,
   Options,

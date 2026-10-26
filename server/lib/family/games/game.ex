@@ -13,6 +13,7 @@ defmodule Family.Games.Game do
     field :version, :integer, default: 0
     field :summary, :string
     belongs_to :last_move_by, Family.Accounts.User
+    field :next_id, :integer
     timestamps(type: :utc_datetime)
   end
 end

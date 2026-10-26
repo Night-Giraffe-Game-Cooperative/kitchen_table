@@ -174,6 +174,20 @@ defmodule Family.PushTest do
     assert %{"kind" => "turn", "body" => "Alex has had a go in Chess.", "url" => url} = FakePush.decrypt(body, phone)
     assert url == "/#/games/#{game.id}"
 
+    # Play again reaches whoever played last time, even without a seat now.
+    word_garden = fn seats, extra -> Map.merge(%{"type" => "word_garden", "mode" => "coop", "seats" => seats, "state" => %{"turn" => "anyone"}}, extra) end
+    finish = fn g -> Games.move(admin, g.id, %{"version" => g.version, "state" => %{"turn" => "anyone"}, "status" => "finished"}) end
+    {:ok, other} = Games.create(admin, room.id, word_garden.(%{}, %{}))
+    {:ok, other} = finish.(other)
+    {:ok, _} = Games.create(admin, room.id, word_garden.(%{}, %{"after" => other.id}))
+    refute_receive {:push, "/lucy", _, _}, 100
+    {:ok, done} = Games.create(admin, room.id, word_garden.(%{"p1" => lucy.id}, %{}))
+    assert_receive {:push, "/lucy", _, _}
+    {:ok, done} = finish.(done)
+    {:ok, _} = Games.create(admin, room.id, word_garden.(%{}, %{"after" => done.id}))
+    assert_receive {:push, "/lucy", _, body}
+    assert %{"title" => "Next round", "body" => "Alex started the next round of Word Garden."} = FakePush.decrypt(body, phone)
+
     # With games switched off for her, it's no news to Lucy whose go it is.
     {:ok, game} = Games.move(lucy, game.id, %{"version" => game.version + 1, "state" => %{"turn" => "w"}})
     {:ok, _} = Family.Accounts.set_permissions(admin, lucy, %{"play_games" => false}, nil)

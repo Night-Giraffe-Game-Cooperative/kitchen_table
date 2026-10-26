@@ -7,7 +7,7 @@ import { listNames, nameOf, playerSeats, seatOf, seatOrder, startGame } from '..
 import { bandOf, type Band } from '../bands';
 import { PhotoPicker, chosenPicture } from '../photos';
 import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
-import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers, winnerText, type Standing } from '../word-garden/Players';
+import { JoinBanner, SeatList, Standings, defaultPlayers, winnerText, type Standing } from '../word-garden/Players';
 import {
   begin,
   everyoneFinished,
@@ -242,7 +242,7 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
               onClick={async () => {
                 setAgain(true);
                 try {
-                  await startGame(game.room_id, 'picture_puzzle', {
+                  await startGame(game, 'picture_puzzle', {
                     mode: 'coop',
                     seats: {},
                     state: { ...s, size: smaller, tiles: scramble(smaller), moves: 0, by: {} },
@@ -317,7 +317,7 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
     setAgain(true);
     try {
       const players = seated.map((k) => game.seats[k] as number);
-      await startGame(game.room_id, 'picture_puzzle', { mode: 'versus', seats: playerSeats(players), state: { ...newRace(s.media, s.size), band: s.band } });
+      await startGame(game, 'picture_puzzle', { mode: 'versus', seats: playerSeats(players), state: { ...newRace(s.media, s.size), band: s.band } });
     } finally {
       setAgain(false);
     }
@@ -450,7 +450,7 @@ function RaceBoard({ game, play, me, people }: GameProps<RaceState>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
+function Options({ value, onChange, mode, room }: OptionsProps<Options>) {
   return (
     <>
       {mode === 'versus' && (
@@ -459,7 +459,6 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
             A race! Everyone gets the same jumbled picture on a board of their own. The fewest swaps wins, and if that's a tie, the quicker
             puzzler wins.
           </p>
-          <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={6} race />
         </>
       )}
       <PhotoPicker roomId={room.id} value={value} onChange={(c) => onChange({ ...value, ...c })} />
@@ -475,6 +474,7 @@ export const picturePuzzle: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or a race for 2 to 6',
+  most: 6,
   defaults: ({ me, room, mode }) => ({ mode, media: null, file: null, players: defaultPlayers(room, me) }),
   ready: (o) => !!(o.media || o.file) && (o.mode !== 'versus' || o.players.length > 0),
   Options,

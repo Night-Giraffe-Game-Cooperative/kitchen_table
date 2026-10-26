@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useStore } from '../lib/store';
 import { api } from '../lib/api';
 import { permissionText, whoCanChange } from '../lib/permissions';
-import { disablePush, enablePush, pushState, testPush, thisDevice, type PushDevice, type PushState } from '../lib/push';
+import { androidApp, disablePush, enablePush, pushState, testPush, thisDevice, type PushDevice, type PushState } from '../lib/push';
 import { ago } from '../lib/time';
 import type { Colour, Me } from '../lib/types';
 import { Avatar, Button, Dialog, Field, Input, Notice, RoleBadge, Segmented, Toggle } from '../components/ui';
@@ -43,7 +43,8 @@ export function MePage() {
       <Appearance />
       <Notifications />
       <Abilities me={me} />
-      <Password />
+      {/* Kids without an email sign in with a code, so they have no password. */}
+      {!me.no_email && <Password />}
       <Install />
       <YourData />
       <div className="row">
@@ -211,7 +212,20 @@ function Notifications() {
   return (
     <section className="panel sheet">
       <h2>Notifications</h2>
-      {state === 'unsupported' && <p className="muted">This browser can't show notifications from the app.</p>}
+      {state === 'unsupported' && !androidApp() && <p className="muted">This browser can't show notifications from the app.</p>}
+      {state === 'unsupported' && androidApp() && (
+        <Notice>
+          <p>
+            The Kitchen Table app can't show notifications: on Android only Chrome can, for a web app. To get them on this phone or tablet, open Kitchen Table in
+            Chrome, choose <strong>Install app</strong> from Chrome's ⋮ menu, and switch notifications on under Me there.
+          </p>
+          {androidApp()! >= 1.1 && (
+            <a className="btn btn-secondary btn-sm" href={`${window.location.origin}/?open=browser#/me`}>
+              Open in Chrome
+            </a>
+          )}
+        </Notice>
+      )}
       {state === 'install-first' && (
         <Notice>
           On iPhone and iPad, notifications need the app on your Home Screen. In Safari, tap Share, then <strong>Add to Home Screen</strong>, open Kitchen

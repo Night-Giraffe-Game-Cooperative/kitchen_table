@@ -419,9 +419,10 @@
   background: transparent;
 }
 
-.month-day[data-other] .month-num,
-.month-day[data-other] .month-items {
-  opacity: 0.55;
+/* Days from the months either side have a quieter number, but whatever's on
+   them stays as easy to read as the rest. */
+.month-day[data-other] .month-num {
+  color: var(--muted);
 }
 
 .month-day[aria-pressed='true'] {
@@ -1192,6 +1193,8 @@
   padding-left: 1.25rem;
   display: grid;
   gap: 0.4rem;
+  /* A long web address breaks onto the next line rather than out of the box. */
+  overflow-wrap: anywhere;
 }
 
 .copy-row {

@@ -27,7 +27,7 @@ import { HINT, TipNote, useLearn, useTips } from '../learn';
 import { PROMOTE_TIP, chessBasics, chessGuide, endTip, explainMove, pieceTips, riskOf, theirMoveTip, turnTips } from './learn';
 import { bandOf, type Band } from '../bands';
 import { confirmFirst } from '../../components/confirm';
-import { OpponentSelect, WhoPlays, whoHint, type Who } from '../opponents';
+import type { Who } from '../opponents';
 
 type Seat = 'white' | 'black';
 
@@ -367,22 +367,9 @@ function Board({ game, play: actions, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange, mode, band, room, me, people }: OptionsProps<Options>) {
-  return mode === 'coop' ? (
-    <>
-      <WhoPlays
-        value={value.who}
-        onChange={(who) => onChange({ ...value, who })}
-        hint={`${whoHint(value.who)} ${band === '14+' ? 'Take a move back whenever you like.' : 'Ask for a hint or take a move back whenever you like.'}`}
-      />
-      <SidePicker value={value} onChange={onChange} label={value.who === 'team' ? 'The family plays' : 'You play'} />
-    </>
-  ) : (
-    <>
-      <OpponentSelect value={value.opponent} onChange={(opponent) => onChange({ ...value, opponent })} room={room} me={me} people={people} />
-      <SidePicker value={value} onChange={onChange} label="You play" />
-    </>
-  );
+// Who plays is chosen first, in New game.
+function Options({ value, onChange, mode }: OptionsProps<Options>) {
+  return <SidePicker value={value} onChange={onChange} label={mode === 'coop' && value.who === 'team' ? 'The family plays' : 'You play'} />;
 }
 
 function SidePicker({ value, onChange, label }: { value: Options; onChange: (o: Options) => void; label: string }) {
@@ -416,6 +403,8 @@ export const chess: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the computer', versus: 'Against each other' },
   modeIcons: { coop: 'robot' },
   players: 'The family or one player against the computer, or 2 players',
+  against: 'the computer',
+  most: 2,
   defaults: () => ({ side: 'white', opponent: 'open', who: 'team' }),
   Options,
   create: (o, { me, mode, band }) => {

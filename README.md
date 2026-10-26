@@ -56,6 +56,10 @@ and a number, like `cabin-clover-berry-42`) by email, and the admin sees it
 on screen too, to read out or write down. It works for 7 days, and signing in
 with it leads straight to choosing a password of their own. Admins can also
 give someone a new one-time password, change their role, or switch them off.
+A kid with no email, like a young cousin, is added with the email left empty
+and gets a sign-in code instead: they press "No email? Sign in with a code" on
+their own tablet and type it in. It works once, and that device stays signed
+in; for another device, an admin or their guardian makes a new code.
 
 **Family bubbles.** Everyone belongs to a family: one household. The family
 that runs Kitchen Table is the home bubble, and only it is in the "Whole
@@ -128,15 +132,23 @@ people.
 for its next move as long as it needs to, and the app says when it's your
 turn. Games keep out of the chat's messages: the games going on in a chat
 show as a slim strip at its top, and the people asked to play get a "New
-game" notification. Most start as the family playing together, and most can also be played
-against each other. Every game has a How to play page (the book button), and
+game" notification. New game asks who's playing first: the family together,
+just you against the computer, or people you pick by name. Playing one person
+puts the game in your chat with them (starting one if there isn't one yet),
+and a game one person plays against the computer is only on their own list.
+Every game has a How to play page (the book button), and
 the games explain themselves as you play: picking up a piece says
 how it moves, special rules are explained when they come up, and a chess hint
 says why the move is good. Each tip shows a few times on a device and then
 stops, and How to play can switch them off. Pressing and holding a game in the
 Games list, or right-clicking it (or the bin in the game), takes it off your
 list; a game still going stops for everyone if you started it or play in it.
-A game nobody has touched for two days is put away as finished.
+A game nobody has touched for two days is put away as finished. Finished
+games leave the list, except the ones that made something to keep: pictures
+from the doodle games and stories from Story Chain. Play again
+keeps everyone together: whoever is looking at the finished game moves on to
+the new round with the person who pressed it, and whoever played last time
+gets a "Next round" notification.
 
 Every game is set up for an age group: 5–7, 8–10, 11–13 or 14 and up. Younger
 groups get easier words and more clues (the picture in Word Garden, the

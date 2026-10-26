@@ -3,6 +3,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { scanContrast, type LowContrast } from './fixtures/contrast';
+import { spills, type Spill } from './fixtures/spills';
 
 // Every screen, for an admin and a kid, on a phone and a tablet, light and
 // dark, checked with axe against WCAG 2.2 AA. Runs after the family story,
@@ -24,6 +25,7 @@ interface Found {
 const found: Found[] = [];
 const unsure: Found[] = [];
 const contrast: (LowContrast & { where: string })[] = [];
+const spilt: (Spill & { where: string })[] = [];
 
 async function signIn(browser: Browser, email: string, password: string, size: typeof phone, colorScheme: 'light' | 'dark') {
   const context = await browser.newContext({ viewport: size, deviceScaleFactor: 1, colorScheme });
@@ -32,7 +34,7 @@ async function signIn(browser: Browser, email: string, password: string, size: t
   if (email) {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Chats', exact: true })).toBeVisible();
   }
   return page;
@@ -250,9 +252,76 @@ test('small phones and large text: nothing runs off the side', async ({ browser 
   await page.context().close();
 });
 
+// Phones and kids' tablets both ways up, with normal and large
+// text: every screen, game and game setup keeps its words inside its boxes.
+for (const [sizeName, size, text, who, password] of [
+  ['small phone, large text', { width: 320, height: 640 }, 'large', 'alex@example.com', 'kitchen table one'],
+  ['phone', phone, 'normal', 'alex@example.com', 'kitchen table one'],
+  ['phone, large text, kid', { width: 412, height: 892 }, 'large', 'alex+mia@example.com', 'unicorns are best'],
+  ['tablet upright', { width: 800, height: 1280 }, 'normal', 'alex+mia@example.com', 'unicorns are best'],
+  ['tablet sideways, large text', { width: 1280, height: 800 }, 'large', 'alex@example.com', 'kitchen table one'],
+  ['tablet sideways', { width: 1280, height: 800 }, 'normal', 'alex@example.com', 'kitchen table one'],
+] as const)
+  test(`words stay inside their boxes: ${sizeName}`, async ({ browser }) => {
+    const page = await signIn(browser, who, password, size, 'light');
+    await page.evaluate((t) => (document.documentElement.dataset.text = t), text);
+    const { rooms } = await api<{ rooms: { id: number }[] }>(page, '/api/rooms');
+    const { games } = await api<{ games: { id: number }[] }>(page, '/api/games');
+    const { people } = await api<{ people: { id: number }[] }>(page, '/api/people');
+    const hashes = [
+      '#/chats',
+      ...rooms.map((r) => `#/chats/${r.id}`),
+      '#/games',
+      ...games.map((g) => `#/games/${g.id}`),
+      '#/calendar',
+      '#/calendar/month',
+      '#/calendar/tasks',
+      '#/calendar/homework',
+      '#/calendar/rewards',
+      '#/people',
+      ...people.map((p) => `#/people/${p.id}`),
+      '#/outbox',
+      '#/me',
+    ];
+    const look = async (where: string) => {
+      for (const s of await spills(page)) spilt.push({ where: `${where} (${sizeName})`, ...s });
+    };
+    for (const hash of hashes) {
+      await page.evaluate((h) => (window.location.hash = h), hash);
+      await page.waitForTimeout(400);
+      await look(hash);
+    }
+    // The New game list, and every game's setup.
+    await page.evaluate(() => (window.location.hash = '#/games'));
+    await page.getByRole('button', { name: 'New game' }).click();
+    const dialog = page.getByRole('dialog');
+    await page.waitForTimeout(300);
+    await look('New game');
+    const names = await dialog.locator('.game-pick, button[data-game]').allInnerTexts();
+    const count = names.length || (await dialog.getByRole('button').count());
+    for (let i = 0; i < count; i++) {
+      const pick = names.length ? dialog.locator('.game-pick, button[data-game]').nth(i) : dialog.getByRole('button').nth(i);
+      const label = (await pick.innerText()).split('\n')[0];
+      await pick.click();
+      await page.waitForTimeout(300);
+      await look(`New game: ${label}`);
+      // And each way of playing it: just me, together, or against someone.
+      const whos = dialog.locator('.who-pick');
+      for (let w = 0; w < (await whos.count()); w++) {
+        await whos.nth(w).click();
+        await page.waitForTimeout(150);
+        await look(`New game: ${label}, ${await whos.nth(w).locator('strong').innerText()}`);
+      }
+      await dialog.getByRole('button', { name: 'Other games' }).click();
+    }
+    expect(spilt.filter((s) => s.where.endsWith(`(${sizeName})`))).toEqual([]);
+    await page.context().close();
+  });
+
 test.afterAll(async () => {
   await fs.mkdir(path.join(import.meta.dirname, '..', 'test-results'), { recursive: true });
   await fs.writeFile(path.join(import.meta.dirname, '..', 'test-results', 'a11y.json'), JSON.stringify(found, null, 2));
   await fs.writeFile(path.join(import.meta.dirname, '..', 'test-results', 'a11y-contrast-unsure.json'), JSON.stringify(unsure, null, 2));
   await fs.writeFile(path.join(import.meta.dirname, '..', 'test-results', 'a11y-contrast.json'), JSON.stringify(contrast, null, 2));
+  await fs.writeFile(path.join(import.meta.dirname, '..', 'test-results', 'a11y-spills.json'), JSON.stringify(spilt, null, 2));
 });

@@ -6,7 +6,7 @@ import { canSpeak, speak, stopSpeaking } from '../../lib/speech';
 import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, nextSeat, pick, playerSeats, seatOf, seatOrder, startGame } from '../common';
-import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers } from '../word-garden/Players';
+import { JoinBanner, SeatList, Standings, defaultPlayers } from '../word-garden/Players';
 import { bandOf, type Band } from '../bands';
 import { HINT, TipNote, useLearn, useTips } from '../learn';
 import { TIPS, helpFor, ideaFor, isStarter, lineHint, partOf, shape, startersFor, storyBasics, writingTips, type Help, type Part } from './help';
@@ -323,7 +323,7 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
       const turned = [...players.slice(1), ...players.slice(0, 1)];
       const seats = playerSeats(turned);
       const starter = pick(startersFor[band].filter((x) => x !== s.starter));
-      await startGame(game.room_id, 'story_chain', { mode: 'versus', seats, state: { ...newStory(starter, s.each, seatOrder(seats)), band: s.band } });
+      await startGame(game, 'story_chain', { mode: 'versus', seats, state: { ...newStory(starter, s.each, seatOrder(seats)), band: s.band } });
     } finally {
       setAgain(false);
     }
@@ -507,7 +507,7 @@ function VersusBoard({ game, play, me, people }: GameProps<StoryVersus>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people, band }: OptionsProps<Options>) {
+function Options({ value, onChange, mode, band }: OptionsProps<Options>) {
   return (
     <>
       {mode === 'versus' && (
@@ -516,7 +516,6 @@ function Options({ value, onChange, mode, room, me, people, band }: OptionsProps
             Take turns writing a line each. When the story is done, everyone gives a star to each line they love. The writer whose lines get the
             most stars wins, and the best line gets a crown.
           </p>
-          <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={6} />
         </>
       )}
       <Field label="How the story starts" hint="Write your own, or use this one.">
@@ -566,6 +565,7 @@ export const storyChain: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or 2 to 6 taking turns',
+  most: 6,
   defaults: ({ me, room, mode, band }) => ({ mode, starter: pick(startersFor[band]), length: 8, players: defaultPlayers(room, me), each: 2 }),
   rebanded: (o, band) => (isStarter(o.starter) ? { ...o, starter: pick(startersFor[band]) } : o),
   ready: (o) => o.starter.trim().length > 0 && (o.mode !== 'versus' || o.players.length > 0),

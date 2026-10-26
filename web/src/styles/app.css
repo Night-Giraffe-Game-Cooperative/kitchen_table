@@ -2300,6 +2300,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0;
   font-size: var(--text-sm);
 }
 
@@ -2312,6 +2313,12 @@ button {
   flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.25rem;
+}
+
+/* "The family or one player against the computer, or 2 players" is wider
+   than a card on a phone, so it wraps rather than pushing the words out. */
+.game-pick-tags .pill {
+  white-space: normal;
 }
 
 .game-body {

@@ -9,8 +9,8 @@ import type { GameDef, GameProps, Mode, OptionsProps, PlayerSeat } from '../comm
 import { nameOf, playerSeats, seatOrder, startGame } from '../common';
 import { bandOf, type Band } from '../bands';
 import { TipNote, useLearn, useTips, type Lesson, type Tip } from '../learn';
-import { WhoPlays, whoHint, type Who } from '../opponents';
-import { JoinBanner, PlayerPicker, defaultPlayers, winnerText } from '../word-garden/Players';
+import type { Who } from '../opponents';
+import { JoinBanner, defaultPlayers, winnerText } from '../word-garden/Players';
 import { CELL, centre, ladderArt, snakeShapes, type Pt } from './art';
 import {
   FAMILY,
@@ -434,7 +434,7 @@ function Board({ game, play, me, people }: GameProps<State>) {
         const open = players.filter((p) => p === 'open') as 'open'[];
         seats = playerSeats([...seated.slice(1), ...seated.slice(0, 1), ...open]);
       }
-      await startGame(game.room_id, TYPE, {
+      await startGame(game, TYPE, {
         mode: game.mode,
         seats,
         state: { ...newGame(b, orderOf({ seats })), band: s.band },
@@ -634,19 +634,12 @@ function Board({ game, play, me, people }: GameProps<State>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
+// Who plays is chosen first, in New game.
+function Options({ mode }: OptionsProps<Options>) {
   return mode === 'coop' ? (
-    <WhoPlays
-      label="Who plays the Night Giraffe"
-      value={value.who}
-      onChange={(who) => onChange({ ...value, who })}
-      hint={`${whoHint(value.who)} The Night Giraffe 🦒 rolls straight after you.`}
-    />
+    <p className="vs-rules">The Night Giraffe 🦒 rolls straight after you.</p>
   ) : (
-    <>
-      <p className="vs-rules">Take turns to roll and move. Ladders take you up, snakes slide you down, and the first to the top wins.</p>
-      <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={6} />
-    </>
+    <p className="vs-rules">Take turns to roll and move. Ladders take you up, snakes slide you down, and the first to the top wins.</p>
   );
 }
 
@@ -668,6 +661,8 @@ export const snakesAndLadders: GameDef<State, Options> = {
   modeLabels: { coop: 'Against the Night Giraffe', versus: 'Against each other' },
   modeIcons: { coop: 'team' },
   players: 'The family or one player against the Night Giraffe, or 2 to 6 players',
+  against: 'the Night Giraffe',
+  most: 6,
   defaults: ({ me, room, mode }) => ({ mode, who: 'team', players: defaultPlayers(room, me) }),
   ready: (o) => o.mode !== 'versus' || o.players.length > 0,
   Options,

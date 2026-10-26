@@ -754,7 +754,7 @@ function Results({ game, me, people }: { game: Game<State>; me: Me; people: Map<
   async function playAgain() {
     setAgain(true);
     try {
-      await startGame(game.room_id, TYPE, { mode: 'coop', seats: {}, state: { ...newQuiz(me.id, s.each), band: s.band } });
+      await startGame(game, TYPE, { mode: 'coop', seats: {}, state: { ...newQuiz(me.id, s.each), band: s.band } });
     } finally {
       setAgain(false);
     }

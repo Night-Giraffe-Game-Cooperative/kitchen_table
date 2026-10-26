@@ -2,6 +2,7 @@ package com.nightgiraffe.kitchentable;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,6 +15,7 @@ import android.net.http.SslCertificate;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.InputType;
 import android.util.Base64;
@@ -26,6 +28,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -39,6 +42,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -48,8 +52,8 @@ import java.util.Locale;
 /**
  * Kitchen Table, full screen, for tablets whose home screen won't take a browser
  * shortcut. It opens the family's own computer and does what the browser would:
- * camera and microphone for video calls, photos to send, and the home-made
- * certificate (trusted the first time, then held to it).
+ * camera and microphone for video calls, photos to send, downloads, and the
+ * home-made certificate (trusted the first time, then held to it).
  */
 public class MainActivity extends Activity {
     private static final int ASK_CALL = 1;
@@ -134,6 +138,11 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
+                // "Open in Chrome", for what only the browser can do, like notifications.
+                if (isHome(url) && "browser".equals(url.getQueryParameter("open"))) {
+                    openInBrowser(url.buildUpon().clearQuery().build());
+                    return true;
+                }
                 if (isHome(url)) return false;
                 // Kitchen Table has moved (the PC sends everyone to the VPS, say): follow it and remember.
                 if (request.isForMainFrame() && request.isRedirect()
@@ -191,6 +200,8 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.setDownloadListener((url, agent, disposition, type, length) -> download(url, agent, disposition, type));
+
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
@@ -215,6 +226,46 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+    }
+
+    // Downloads, like "Download my things" or a photo, go to the Downloads folder
+
+    private void download(String url, String agent, String disposition, String type) {
+        Uri uri = Uri.parse(url);
+        if (!isHome(uri)) {
+            openInBrowser(uri);
+            return;
+        }
+        String name = URLUtil.guessFileName(url, disposition, type);
+        try {
+            // Signed in as the person using the app, so it gets their things.
+            String cookie = CookieManager.getInstance().getCookie(url);
+            DownloadManager.Request request = new DownloadManager.Request(uri)
+                    .addRequestHeader("User-Agent", agent)
+                    .setMimeType(type)
+                    .setTitle(name)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            if (cookie != null) request.addRequestHeader("Cookie", cookie);
+            if (Build.VERSION.SDK_INT >= 29) request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+            ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
+            Toast.makeText(this, "Downloading " + name + ". It goes in Downloads.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "That didn't download. Try again, or open Kitchen Table in Chrome.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Chrome if it's there, otherwise whichever browser the tablet has. */
+    private void openInBrowser(Uri url) {
+        Intent view = new Intent(Intent.ACTION_VIEW, url).addCategory(Intent.CATEGORY_BROWSABLE);
+        try {
+            startActivity(new Intent(view).setPackage("com.android.chrome"));
+        } catch (Exception noChrome) {
+            try {
+                startActivity(view);
+            } catch (Exception noBrowser) {
+                Toast.makeText(this, "There's no browser on this tablet to open it in.", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     // Camera and microphone for video calls

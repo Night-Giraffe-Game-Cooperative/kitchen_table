@@ -156,7 +156,8 @@ defmodule FamilyWeb.Present do
   def person_admin(%User{} = u) do
     person(u)
     |> Map.merge(%{
-      email: u.email,
+      email: User.email(u),
+      no_email: User.no_email?(u),
       must_change_password: u.must_change_password,
       otp_expires_at: u.otp_expires_at,
       overrides: u.permissions || %{},
@@ -168,7 +169,8 @@ defmodule FamilyWeb.Present do
   def me(%User{} = u) do
     person(u)
     |> Map.merge(%{
-      email: u.email,
+      email: User.email(u),
+      no_email: User.no_email?(u),
       must_change_password: u.must_change_password,
       permissions: Permissions.effective(u),
       quiet_hours: u.quiet_hours,
@@ -279,6 +281,7 @@ defmodule FamilyWeb.Present do
       summary: g.summary,
       created_by_id: g.created_by_id,
       last_move_by_id: g.last_move_by_id,
+      next_id: g.next_id,
       updated_at: g.updated_at,
       inserted_at: g.inserted_at
     }

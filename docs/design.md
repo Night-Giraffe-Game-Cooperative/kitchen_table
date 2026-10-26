@@ -489,3 +489,50 @@ chat with game news. Now the chat shows the games going on in it as a slim
 strip above the messages (up to three, then "N more"), highlighted when it's
 your go, and the people given a seat get a "New game" notification instead.
 Whose turn it is already reaches them the same way.
+
+24 Oct 2026. Play again keeps everyone together. Play again used to start
+a separate game only the person who pressed it saw, so the others were left
+looking at the last round's result. Now the new game is started after the
+last one, which points at it, and everyone looking at the last one is moved
+on to it. Two people pressing it at once land in the same game, and anyone
+who played last time hears about the next round even when its seats have
+changed (Where's the Giraffe? gives the finder a new seat as hider).
+
+24 Oct 2026. Words stay inside their boxes. The browser tests now look for
+text running out of any box (anything with a background, a border or hidden
+overflow) on every screen, game and game setup, on phones and tablets both
+ways up, with normal and large text. Text a box scrolls, cuts short with an
+ellipsis on purpose, or keeps for screen readers is allowed. It found long
+"who plays" labels and a web address that wouldn't wrap.
+
+24 Oct 2026. Kids without an email sign in with a code. Cousins and young
+kids often have no email, and a made-up one meant a password nobody could
+reset. Now a kid can be added with the email left empty: they're stored with
+a stand-in address that can never receive mail, and get a sign-in code in the
+same three-words-and-a-number shape as a one-time password. The code works
+once, within 7 days, and leaves that device signed in with no password to
+choose. For another device an admin or one of their guardians makes a new
+code. Nothing is emailed for them.
+
+24 Oct 2026. The Android app saves downloads and points at Chrome for
+notifications. Its web view dropped downloads on the floor, so "Download my
+things" and saved photos did nothing; they now go to Downloads through the
+system's download manager. Android only lets a browser show Web Push
+notifications, so the app can't, and Me says so plainly with a button that
+opens Kitchen Table in Chrome, where Install app and notifications work.
+
+24 Oct 2026. New game asks who's playing first. Who plays was set inside each
+game's options, in a different way per game ("Everyone in the chat" or "Just
+me", "Playing against", a row of chips, "Play in"), so starting a game with
+one person, or against the computer alone, wasn't obvious. Now New game
+starts with Who's playing?: the family together (choosing which chat), just
+me against the computer, or against people picked by name. One person means
+the game goes in your chat with them, started if there isn't one; several
+means the smallest chat with them all in. A game one person plays against
+the computer is only on their own list.
+
+24 Oct 2026. Only pictures and stories stay once a game is over. Every
+finished game stayed on the Games list, which filled it with old rounds
+nobody would open again. Now finished games leave the list unless they made
+something to keep: Doodle Together, Doodle Telephone, Doodle Battle and Story
+Chain. Anyone already looking at a finished game can still see how it ended.

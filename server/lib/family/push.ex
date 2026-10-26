@@ -236,16 +236,21 @@ defmodule Family.Push do
   A new game: the people given a seat in it hear who asked them to play,
   except the starter, and whoever's turn it is, who hears that instead.
   """
-  def game_started(game) do
+  def game_started(game, last \\ nil) do
     turn = Map.get(game.seats, Map.get(game.state, "turn", "anyone"))
-    ids = for {_, id} <- game.seats, is_integer(id), id != game.created_by_id, id != turn, uniq: true, do: id
+    # A next round also reaches whoever played in the last one.
+    seats = Map.values(game.seats) ++ if(last, do: Map.values(last.seats), else: [])
+    ids = for id <- seats, is_integer(id), id != game.created_by_id, id != turn, uniq: true, do: id
 
     if ids != [] do
       later(fn ->
         who = Repo.get(User, game.created_by_id)
         name = Map.get(@games, game.type, "a game")
-        body = "#{who.name} started #{name} with you."
-        notify(able(ids, :play_games), %{kind: "game", title: "New game", body: body, tag: "game-#{game.id}", url: "/#/games/#{game.id}"}, topic: "game-#{game.id}")
+
+        {title, body} =
+          if last, do: {"Next round", "#{who.name} started the next round of #{name}."}, else: {"New game", "#{who.name} started #{name} with you."}
+
+        notify(able(ids, :play_games), %{kind: "game", title: title, body: body, tag: "game-#{game.id}", url: "/#/games/#{game.id}"}, topic: "game-#{game.id}")
       end)
     end
 

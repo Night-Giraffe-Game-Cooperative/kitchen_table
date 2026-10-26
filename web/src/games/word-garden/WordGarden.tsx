@@ -4,7 +4,7 @@ import { canSpeak, speak } from '../../lib/speech';
 import type { Game } from '../../lib/types';
 import type { GameDef, GameProps, OptionsProps, PlayerSeat, Update } from '../common';
 import { listNames, nameOf, nextSeat, pick, playerSeats, seatOf, seatOrder, startGame } from '../common';
-import { JoinBanner, PlayerPicker, SeatList, Standings, defaultPlayers, winnerText } from './Players';
+import { JoinBanner, SeatList, Standings, defaultPlayers, winnerText } from './Players';
 import {
   BONUS,
   chooseWords,
@@ -278,7 +278,7 @@ function CoopBoard({ game, play, me, people }: GameProps<CoopState>) {
               onClick={async () => {
                 setAgain(true);
                 try {
-                  await startGame(game.room_id, 'word_garden', {
+                  await startGame(game, 'word_garden', {
                     mode: 'coop',
                     seats: {},
                     state: newState({ category: s.pick, band: s.band, length: s.length }, s.word),
@@ -395,7 +395,7 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
       const turned = [...players.slice(1), ...players.slice(0, 1)];
       const seats = playerSeats(turned);
       const words = chooseWords(s.pick, s.band ?? s.length ?? 'any', s.words.length);
-      await startGame(game.room_id, 'word_garden', {
+      await startGame(game, 'word_garden', {
         mode: 'versus',
         seats,
         state: newVersus(words, seatOrder(seats), { band: s.band, length: s.length, pick: s.pick }),
@@ -565,7 +565,7 @@ function VersusBoard({ game, play, me, people }: GameProps<VersusState>) {
   );
 }
 
-function Options({ value, onChange, mode, room, me, people }: OptionsProps<Options>) {
+function Options({ value, onChange, mode }: OptionsProps<Options>) {
   return (
     <>
       {mode === 'versus' && (
@@ -574,7 +574,6 @@ function Options({ value, onChange, mode, room, me, people }: OptionsProps<Optio
             Take turns guessing letters. A right letter grows a flower for you each time it's in the word, and you go again. A wrong one passes the
             turn. Finish a word for {BONUS} bonus flowers. Most flowers wins!
           </p>
-          <PlayerPicker value={value.players} onChange={(players) => onChange({ ...value, players })} room={room} me={me} people={people} max={4} />
           <div className="field">
             <span className="field-label">How many words</span>
             <Segmented
@@ -614,6 +613,7 @@ export const wordGarden: GameDef<State, Options> = {
   modes: ['coop', 'versus'],
   modeLabels: { coop: 'Together', versus: 'Against each other' },
   players: 'Any number, or 2 to 4 taking turns',
+  most: 4,
   defaults: ({ me, room, mode }) => ({ mode, category: 'mixed', players: defaultPlayers(room, me), rounds: 1 }),
   ready: (o) => o.mode !== 'versus' || o.players.length > 0,
   Options,

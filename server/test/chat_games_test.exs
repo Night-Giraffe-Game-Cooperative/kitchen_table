@@ -82,7 +82,8 @@ defmodule Family.ChatGamesTest do
     assert %{status: "finished", summary: "Jo stopped the chess game", state: %{"ended" => "stopped"}} = Games.get(game.id)
     ids = fn user -> user |> Games.list_for() |> Enum.map(& &1.id) end
     refute game.id in ids.(grownup)
-    assert game.id in ids.(kid)
+    # A finished chess game leaves everyone's list: only pictures and stories stay.
+    refute game.id in ids.(kid)
     assert Chat.list_messages(room.id) == []
 
     # Someone not playing only takes it off their own list; a finished game just goes.
@@ -91,7 +92,6 @@ defmodule Family.ChatGamesTest do
     assert %{status: "active"} = Games.get(other.id)
     refute other.id in ids.(third)
     assert {:ok, false} = Games.remove(kid, game.id)
-    refute game.id in ids.(kid)
     assert {:error, :not_found} = Games.remove(kid, -1)
   end
 
@@ -114,6 +114,62 @@ defmodule Family.ChatGamesTest do
     assert %{summary: "Mia won"} = Games.get(done.id)
     assert {:error, "That game has finished."} = Games.move(kid, quiet.id, %{"version" => 1, "state" => %{"turn" => "b"}})
     assert Games.finish_idle(now) == 0
+  end
+
+  test "play again starts one next round, and the last game points at it", %{kid: kid, grownup: grownup, admin: admin, room: room} do
+    chess = %{"type" => "chess", "mode" => "versus", "seats" => %{"w" => kid.id, "b" => grownup.id}, "state" => %{"turn" => "w"}}
+    {:ok, last} = Games.create(kid, room.id, chess)
+    {:ok, last} = Games.move(kid, last.id, %{"version" => 0, "state" => %{"turn" => "b"}, "status" => "finished", "summary" => "Mia won"})
+    FamilyWeb.Endpoint.subscribe("game:#{last.id}")
+
+    again = Map.merge(chess, %{"after" => last.id, "seats" => %{"w" => grownup.id, "b" => kid.id}})
+    {:ok, next} = Games.create(grownup, room.id, again)
+    assert Games.get(last.id).next_id == next.id
+    # Everyone looking at the last game hears where the next one is.
+    next_id = next.id
+    assert_receive %Phoenix.Socket.Broadcast{event: "game:updated", payload: %{id: _, next_id: ^next_id}}
+
+    # Mia pressed Play again at the same moment: she joins the same round.
+    assert {:ok, %{id: ^next_id}} = Games.create(kid, room.id, Map.put(again, "after", to_string(last.id)))
+    assert [%{id: ^next_id}] = Games.list_for(kid)
+
+    # Once that round is over too, Play again on the old one starts afresh.
+    {:ok, _} = Games.remove(grownup, next.id)
+    {:ok, third} = Games.create(kid, room.id, again)
+    refute third.id == next.id
+    assert Games.get(last.id).next_id == third.id
+
+    # Only a game from the same chat counts.
+    {:ok, other} = Chat.create_room(admin, %{"name" => "Grown-ups", "member_ids" => [grownup.id]})
+    assert {:error, :not_found} = Games.create(grownup, other.id, again)
+  end
+
+  test "finished games stay on the list only when they made a picture or a story", %{kid: kid, room: room} do
+    finish = fn g -> {:ok, g} = Games.move(kid, g.id, %{"version" => g.version, "state" => %{"turn" => "anyone"}, "status" => "finished"}); g end
+    make = fn type, mode -> {:ok, g} = Games.create(kid, room.id, %{"type" => type, "mode" => mode, "seats" => %{}, "state" => %{"turn" => "anyone"}}); g end
+
+    doodle = make.("doodle_together", "coop") |> finish.()
+    story = make.("story_chain", "coop") |> finish.()
+    quiz = make.("family_quiz", "coop") |> finish.()
+    going = make.("family_quiz", "coop")
+
+    listed = kid |> Games.list_for() |> Enum.map(& &1.id)
+    assert going.id in listed and doodle.id in listed and story.id in listed
+    refute quiz.id in listed
+    # It's still there to look at for anyone who has it open.
+    assert %{status: "finished"} = Games.get_for(kid, quiz.id)
+  end
+
+  test "one person against the computer is only on their own list", %{kid: kid, grownup: grownup, room: room} do
+    make = fn seats -> {:ok, g} = Games.create(kid, room.id, %{"type" => "chess", "mode" => "coop", "seats" => seats, "state" => %{"turn" => "white"}}); g end
+
+    solo = make.(%{"white" => kid.id, "black" => "computer"})
+    family = make.(%{"white" => "team", "black" => "computer"})
+
+    assert solo.id in (kid |> Games.list_for() |> Enum.map(& &1.id))
+    theirs = grownup |> Games.list_for() |> Enum.map(& &1.id)
+    refute solo.id in theirs
+    assert family.id in theirs
   end
 
   test "co-op games let anyone on the team move, and doodles append strokes", %{kid: kid, grownup: grownup, room: room} do
