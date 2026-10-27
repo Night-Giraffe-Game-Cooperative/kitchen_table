@@ -6,7 +6,7 @@ import { Avatar, Button, Field, IconButton, Input, Notice, Segmented } from '../
 import { InfoTip } from '../components/tips';
 import { errorText, useLive } from './tasksShared';
 import { BANDS, bandLabel, defaultBand, rememberBand, type Band } from '../games/bands';
-import { canSpeak, hasVoice, speakIn } from '../lib/speech';
+import { canSpeak, hasVoice, playClip, speakIn } from '../lib/speech';
 import { shuffle } from '../games/common';
 import { ROAD_TEST, TRAIN_QUIZ, roadSigns } from '../learn/japanTravel';
 import { factFor, sleepsUntil, spots } from '../learn/japanFun';
@@ -26,6 +26,7 @@ import {
   type Phrase,
   type Script,
 } from '../learn/phrases';
+import { hasClips, kanaClip, phraseClip } from '../learn/voices';
 
 // Learning a language together for a holiday: phrases to say, signs to spot,
 // and for Japanese the characters. Everyone marks what they know, and the
@@ -59,7 +60,20 @@ const bandHint: Record<Level, string> = {
   3: 'Everything, with longer sentences.',
 };
 
-const say = (p: Phrase, lang: Language, slowly = false) => speakIn(p.speak ?? p.text, lang.bcp47, { slowly });
+function say(p: Phrase, lang: Language, slowly = false) {
+  const clip = phraseClip(lang.id, p, slowly);
+  if (clip) playClip(clip);
+  else speakIn(p.speak ?? p.text, lang.bcp47, { slowly });
+}
+
+function sayKana(k: Kana) {
+  const clip = kanaClip(k.roman);
+  if (clip) playClip(clip);
+  else speakIn(k.char, 'ja-JP');
+}
+
+/** Whether there's a way to hear a language: its recordings, or a voice on the device. */
+const canHear = (lang: Language) => hasClips(lang.id) || canSpeak;
 
 export function Learn() {
   const { me, people, toast } = useStore();
@@ -150,7 +164,7 @@ export function Learn() {
         <Segmented label="Language" value={lang} onChange={chooseLang} options={languages.map((l) => ({ value: l.id, label: `${l.flag} ${l.name}` }))} />
       </div>
 
-      {canSpeak && !hasVoice(language.bcp47) && (
+      {canSpeak && !hasClips(language.id) && !hasVoice(language.bcp47) && (
         <Notice tone="info">
           This device has no {language.name} voice, so it can't read the phrases aloud. The how-to-say-it spelling under each one still helps.
         </Notice>
@@ -371,7 +385,7 @@ function TodayPhrase({ language }: { language: Language }) {
         {phrase.say}
         {phrase.roman && <span className="muted"> · {phrase.roman}</span>}
       </p>
-      {canSpeak && (
+      {canHear(language) && (
         <div className="learn-today-actions">
           <Button icon="speaker" variant="primary" onClick={() => say(phrase, language)}>
             Hear it
@@ -454,7 +468,7 @@ function PhraseRow({
 }) {
   return (
     <li className={`phrase sheet${sign ? ' phrase-sign' : ''}`} data-known={mine || undefined}>
-      {canSpeak && <IconButton icon="speaker" label={`Hear "${phrase.en}"`} className="phrase-hear" onClick={() => say(phrase, language)} />}
+      {canHear(language) && <IconButton icon="speaker" label={`Hear "${phrase.en}"`} className="phrase-hear" onClick={() => say(phrase, language)} />}
       <div className="phrase-text">
         <span className="phrase-en">{phrase.en}</span>
         <span className="phrase-native" lang={language.bcp47}>
@@ -550,7 +564,7 @@ function Practise({ language, level, iKnow, onKnow }: { language: Language; leve
             {card.say}
             {card.roman && <span className="muted"> · {card.roman}</span>}
           </p>
-          {canSpeak && (
+          {canHear(language) && (
             <div className="learn-today-actions">
               <Button icon="speaker" onClick={() => say(card, language)}>
                 Hear it again
@@ -616,7 +630,7 @@ function Characters({ level, iKnow, onKnow }: { level: Level; iKnow: (key: strin
                   className="kana"
                   data-known={iKnow(keyOf('ja', k.id)) || undefined}
                   aria-label={`${k.char}, ${k.roman}${iKnow(keyOf('ja', k.id)) ? ', you know it' : ''}`}
-                  onClick={() => speakIn(k.char, 'ja-JP')}
+                  onClick={() => sayKana(k)}
                 >
                   <span className="kana-char" lang="ja-JP">
                     {k.char}
@@ -664,7 +678,7 @@ function KanaQuiz({
   function choose(roman: string) {
     if (picked) return;
     setPicked(roman);
-    speakIn(kana.char, 'ja-JP');
+    sayKana(kana);
     if (roman === kana.roman) {
       setRight((n) => n + 1);
       const key = keyOf('ja', kana.id);

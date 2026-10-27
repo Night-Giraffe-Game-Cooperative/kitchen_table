@@ -1321,7 +1321,10 @@ test('Learn: holiday phrases in Japanese and French, learned as a family', async
   // Each phrase has its words, how to say it, a speaker, and I know it.
   const thanks = admin.locator('.phrase', { hasText: 'ありがとう' }).first();
   await expect(thanks).toContainText('ah-ree-gah-toh');
-  await expect(thanks.getByRole('button', { name: 'Hear "Thank you"' })).toBeVisible();
+  // The speaker plays a real recording, so it works without a Japanese voice on the device.
+  const clip = admin.waitForResponse((r) => /\/assets\/thank_you-[\w-]+\.mp3$/.test(r.url()) && r.ok());
+  await thanks.getByRole('button', { name: 'Hear "Thank you"' }).click();
+  await clip;
   await thanks.getByRole('button', { name: 'I know "Thank you"' }).click();
   await expect(thanks.getByRole('button', { name: 'I know "Thank you"' })).toHaveAttribute('aria-pressed', 'true');
   await expect(admin.locator('.learn-family')).toContainText('1 phrase');

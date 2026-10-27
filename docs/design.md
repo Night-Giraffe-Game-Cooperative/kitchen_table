@@ -640,3 +640,19 @@ fillings, then Roll it), and up to 13 the next thing to tap glows, so the
 youngest can follow the glow while older players race. Stars go by how long
 a wave took for its number of dishes, never by mistakes, and a wrong dish
 just goes round the belt.
+
+26 Oct 2026. Real voices in Learn. Asked for because the device voices
+vary: some tablets have no Japanese or French voice at all, and others sound
+robotic. Each phrase, sign and kana sound is now a short MP3, normal and
+slow, made ahead of time with Kokoro, an open voice model (Apache 2.0), so
+it's the same on every device, plays with no internet once heard (the files
+have their contents in their names, so the app keeps them), and needs
+nothing installed. Recordings of people would be better still, but none
+with a free licence covered every phrase. Each recording notes the words it
+says, so a phrase edited later falls back to the device's voice rather than
+saying something stale, and a test fails until it's recorded again. The
+slow versions are the normal recording stretched, since asking the voice
+itself to talk slowly added stray sounds at the start. Of Kokoro's Japanese
+voices, Tebukuro was understood most often when the recordings were played
+to a speech recogniser.
+

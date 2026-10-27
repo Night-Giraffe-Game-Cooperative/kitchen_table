@@ -1,5 +1,5 @@
 // Reads messages and stories aloud with the device's own voice, for children
-// who are still learning to read, and holiday phrases in their own language.
+// who are still learning to read, and plays the Learn page's recordings.
 // The Android app's web view has no voice of its own, so the app lends its one.
 
 interface AppVoice {
@@ -36,6 +36,7 @@ const clean = (text: string) => text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27
 export function speakIn(text: string, lang: string, { slowly = false, onEnd }: { slowly?: boolean; onEnd?: () => void } = {}) {
   if (!canSpeak || !text.trim()) return;
   const rate = slowly ? 0.6 : lang.startsWith('en') ? 0.92 : 0.85;
+  player?.pause();
   if (appVoice) {
     appVoice.speak(clean(text), lang, rate);
     onEnd?.();
@@ -64,7 +65,20 @@ export function speak(text: string, onEnd?: () => void) {
   speakIn(text, 'en-GB', { onEnd });
 }
 
+let player: HTMLAudioElement | null = null;
+
+/** Plays a recording, like a phrase on the Learn page, instead of the device's voice. */
+export function playClip(url: string, onEnd?: () => void) {
+  stopSpeaking();
+  const audio = new Audio(url);
+  player = audio;
+  audio.onended = audio.onerror = () => onEnd?.();
+  audio.play().catch(() => onEnd?.());
+}
+
 export function stopSpeaking() {
+  player?.pause();
+  player = null;
   if (appVoice) appVoice.stop();
   else if (canSpeak) window.speechSynthesis.cancel();
 }

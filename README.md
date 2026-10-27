@@ -195,8 +195,11 @@ chart to tap and hear, and a quiz. Everyone presses "I know it" on what
 they've learned, and the family can see who knows what, so learning it is a
 shared thing. There's a phrase of the day, flashcards that start with what
 you don't know yet, and an age choice: 5 to 7 keeps to the simplest
-phrases, and older ages add more. Phones and computers read aloud with their
-own voices; the Android app does too (see
+phrases, and older ages add more. Every phrase, sign and kana sound has a
+recording, normal and slow, made with [Kokoro](https://github.com/hexgrad/kokoro),
+an open voice model (Apache 2.0), so it sounds natural and needs no voice
+installed on the device. Anything without a recording yet is read by the
+device's own voice, as on the Android app (see
 [part 5 of Get going](docs/getting-started.md#5-the-android-app-for-kids-tablets)).
 
 A grown-up can set when the family goes, and then Learn counts the sleeps
