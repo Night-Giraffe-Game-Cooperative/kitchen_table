@@ -78,6 +78,36 @@
   border: 1px solid #8a6a2a;
 }
 
+/* A grown-up has muted you or put your pens away: says who, until they let you again. */
+.call-banner-rule {
+  justify-content: center;
+  align-self: center;
+  border: 1px solid rgb(255 224 138 / 0.5);
+  background: rgb(255 224 138 / 0.16);
+  font-weight: 700;
+}
+
+.call-banner-rule[data-nudged] {
+  animation: rule-wiggle 0.45s ease;
+}
+
+@keyframes rule-wiggle {
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-banner-rule[data-nudged] {
+    animation: none;
+  }
+}
+
 .call-banner-button {
   border: 1px solid rgb(255 255 255 / 0.3);
   justify-content: center;
@@ -331,6 +361,26 @@
   transition:
     transform var(--motion-fast) var(--ease),
     box-shadow var(--motion-fast) var(--ease);
+}
+
+/* Switched off by a grown-up for now: a little padlock on the button. */
+.call-btn[data-locked] .call-btn-face {
+  position: relative;
+  opacity: 0.8;
+}
+
+.call-btn-lock {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #1b1d21;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--call-button);
 }
 
 .call-btn:active:not(:disabled) .call-btn-face {
@@ -1283,6 +1333,36 @@
   box-shadow: 0 2px 0 #000;
 }
 
+/* ---------- A grown-up's switches for the kids in the call ---------- */
+
+.kids-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kids-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+}
+
+.kids-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: auto;
+  font-weight: 700;
+}
+
+/* Muted, or pens away: the button that lets them again stands out. */
+.ink-action[data-held] {
+  background: #ffe08a;
+}
+
 /* An idea for what to draw, on a sticky note at the top of the call. */
 .call-idea {
   position: absolute;
@@ -1385,10 +1465,23 @@
     height: 2.9rem;
   }
 
+  /* Labels go onto two lines where they need it. */
   .call-btn-label {
     font-size: 0.68rem;
     line-height: 1.15;
     text-align: center;
+    white-space: normal;
+  }
+
+  /* Eight or nine buttons (a flip button, a grown-up's Kids): smaller faces. */
+  .call-controls:has(> :nth-child(8)) .call-btn-face {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .call-controls:has(> :nth-child(9)) .call-btn-face {
+    width: 2.35rem;
+    height: 2.35rem;
   }
 }
 

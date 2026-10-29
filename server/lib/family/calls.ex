@@ -4,7 +4,8 @@ defmodule Family.Calls do
   devices in a call; this keeps track of who is in each one, rings the rest of
   the chat when a call starts, notes the call in the chat, and holds the state
   of any game being played in the call, and the drawings on people's
-  pictures, so late joiners see them too.
+  pictures, so late joiners see them too. It also holds the rules a grown-up
+  has set in the call: which kids are muted, and whose pens are away.
 
   Calls live only in memory. When the last device leaves, the call waits a few
   seconds (a page reload shouldn't end it) and then ends.
@@ -39,6 +40,21 @@ defmodule Family.Calls do
   def remove_stroke(room_id, id), do: GenServer.call(__MODULE__, {:remove_stroke, room_id, id})
 
   def wipe_ink(room_id), do: GenServer.call(__MODULE__, {:wipe_ink, room_id})
+
+  @doc """
+  The rules a grown-up has set in a room's call: who is muted, and whose pens
+  are away, each as %{user_id => the grown-up who did it}. They last as long
+  as the call, so leaving and coming back doesn't clear them.
+  """
+  def rules(room_id), do: GenServer.call(__MODULE__, {:rules, room_id})
+
+  @doc """
+  Mutes these people, or puts their pens away (rule :muted or :no_pens), or
+  with on false lets them again. Only people who have been in the call count.
+  Returns {:ok, the rules now}.
+  """
+  def put_rule(room_id, rule, user_ids, on, by) when rule in [:muted, :no_pens] and is_boolean(on),
+    do: GenServer.call(__MODULE__, {:put_rule, room_id, rule, user_ids, on, by})
 
   @impl true
   def init(:ok), do: {:ok, %{calls: %{}, monitors: %{}}}
@@ -94,6 +110,24 @@ defmodule Family.Calls do
 
   def handle_call({:wipe_ink, room_id}, _from, state) do
     update_call(state, room_id, &%{&1 | ink: []})
+  end
+
+  def handle_call({:rules, room_id}, _from, state) do
+    {:reply, get_in(state.calls, [room_id, :rules]) || no_rules(), state}
+  end
+
+  def handle_call({:put_rule, room_id, rule, user_ids, on, by}, _from, state) do
+    case state.calls[room_id] do
+      nil ->
+        {:reply, {:error, :no_call}, state}
+
+      call ->
+        ids = Enum.filter(user_ids, &MapSet.member?(call.everyone, &1))
+        set = call.rules[rule]
+        set = if on, do: Enum.reduce(ids, set, &Map.put_new(&2, &1, by)), else: Map.drop(set, ids)
+        rules = Map.put(call.rules, rule, set)
+        {:reply, {:ok, rules}, put_in(state.calls[room_id], %{call | rules: rules})}
+    end
   end
 
   defp update_call(state, room_id, fun) do
@@ -170,9 +204,12 @@ defmodule Family.Calls do
       rung: others,
       game: nil,
       ink: [],
+      rules: no_rules(),
       ending: nil
     }
   end
+
+  defp no_rules, do: %{muted: %{}, no_pens: %{}}
 
   defp end_call(room_id, call) do
     seconds = DateTime.diff(DateTime.utc_now(), call.started_at)

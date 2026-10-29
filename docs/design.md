@@ -656,3 +656,18 @@ itself to talk slowly added stray sounds at the start. Of Kokoro's Japanese
 voices, Tebukuro was understood most often when the recordings were played
 to a speech recogniser.
 
+27 Oct 2026. Grown-ups can mute kids in a call and stop them drawing. Asked
+for so a grown-up can calm a noisy or over-excited call. The Kids button
+shows only to grown-ups, and only while a kid is in the call; its tray has
+Mute and Stop drawing for each kid, the same for all kids at once when
+there's more than one, and Wipe all drawings. Any grown-up in the call can
+use it, including one from another family, since muting and putting pens
+away only ever take something away. The rules live with the call on the
+server, so a kid can't undo them by leaving and coming back, and every
+device keeps to them: the kid's microphone goes off and their Mute button
+locks, everyone else's device stops playing the kid's sound (so it holds
+even on a device running an older version of the app), and the server
+drops drawings from a kid whose pens are away. The kid sees a note at the
+top saying who did it, and a tap on a locked button gives the note a
+wiggle. When a grown-up lets them again, the microphone goes back to how
+the kid had it, and a note says they can talk or draw again.

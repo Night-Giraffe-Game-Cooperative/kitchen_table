@@ -1,7 +1,8 @@
 // A video call on this device. Every device in the call connects straight to
 // every other one (fine for a family of up to about six); the server's call
 // channel only passes the connection offers between them, says who is in the
-// call, and carries the games played in it.
+// call, and carries the games played in it, and the rules a grown-up sets:
+// which kids are muted, and whose pens are away.
 //
 // Connections use the "perfect negotiation" pattern: both sides may start
 // one, and when offers cross, the polite side gives way. To keep offers from
@@ -43,6 +44,16 @@ export interface InkIdea {
   by: number;
 }
 
+/** What a grown-up has set in the call, each as kid's user id → the grown-up who set it. */
+export interface CallRules {
+  /** Kids who are muted: their microphone stays off, and no one hears them, until a grown-up lets them talk. */
+  muted: Record<number, number>;
+  /** Kids whose pens are away, so they can't draw on the pictures. */
+  noPens: Record<number, number>;
+}
+
+export const noRules: CallRules = { muted: {}, noPens: {} };
+
 export interface CallSnapshot {
   status: 'starting' | 'in-call' | 'ended';
   /** Why the camera or the call isn't working, if it isn't. */
@@ -67,6 +78,7 @@ export interface CallSnapshot {
   myInk: number;
   /** A suggestion for what to draw on someone, shown to everyone for a while. */
   idea: InkIdea | null;
+  rules: CallRules;
 }
 
 interface Conn {
@@ -132,6 +144,9 @@ export class CallSession {
   private inkDirty = new Set<string>();
   private inkTimer = 0;
   private idea: InkIdea | null = null;
+  private rules: CallRules = noRules;
+  /** Whether this device was muted before a grown-up muted it, while they have. */
+  private mutedBefore: boolean | null = null;
   private status: CallSnapshot['status'] = 'starting';
   private error: CallError | null = null;
   private startedAt: number | null = null;
@@ -190,6 +205,7 @@ export class CallSession {
       inkCount: this.ink.size,
       myInk: this.myStrokes.length,
       idea: this.idea,
+      rules: this.rules,
     };
   }
 
@@ -306,6 +322,29 @@ export class CallSession {
         this.idea = null;
         this.emit();
       }, 15000);
+    });
+
+    channel.on('rules', ({ muted, no_pens }: { muted: Record<string, number>; no_pens: Record<string, number> }) => {
+      this.rules = { muted: byUser(muted), noPens: byUser(no_pens) };
+      // Muted by a grown-up: the microphone goes off, and stays off until
+      // they say. Then it goes back to how it was.
+      const hushed = !!this.rules.muted[this.me];
+      if (hushed && this.mutedBefore === null) {
+        this.mutedBefore = this.state.muted;
+        this.setMuted(true);
+      } else if (!hushed && this.mutedBefore !== null) {
+        const before = this.mutedBefore;
+        this.mutedBefore = null;
+        this.setMuted(before);
+      }
+      // Pens away: anything half drawn goes, here and everywhere else.
+      let changed = false;
+      for (const [id, s] of this.ink) {
+        const unfinished = id.startsWith(this.peerId) ? this.inkSent.has(id) : s.live;
+        if (unfinished && this.rules.noPens[s.by]) changed = this.ink.delete(id);
+      }
+      if (changed) this.emitInk();
+      this.emit();
     });
 
     channel.on('react', ({ emoji, user_id }: { emoji: string; user_id: number }) => {
@@ -612,6 +651,7 @@ export class CallSession {
   }
 
   setMuted(muted: boolean) {
+    if (!muted && this.rules.muted[this.me]) return;
     this.state.muted = muted;
     this.local?.getAudioTracks().forEach((t) => (t.enabled = !muted));
     this.pushState();
@@ -663,6 +703,11 @@ export class CallSession {
     this.channel?.push('react', { emoji });
   }
 
+  /** For grown-ups: mutes kids or puts their pens away, or lets them again. */
+  setRule(rule: 'mute' | 'pens', userIds: number[], on: boolean) {
+    if (userIds.length) this.channel?.push('rule', { rule, user_ids: userIds, on });
+  }
+
   leave() {
     if (this.closed) return;
     this.closed = true;
@@ -673,6 +718,10 @@ export class CallSession {
     this.status = 'ended';
     this.emit();
   }
+}
+
+function byUser(ids: Record<string, number>): Record<number, number> {
+  return Object.fromEntries(Object.entries(ids ?? {}).map(([id, by]) => [Number(id), by]));
 }
 
 function stopAll(stream: MediaStream | null) {

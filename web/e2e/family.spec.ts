@@ -600,6 +600,32 @@ test('a video call: ringing, drawing on each other, and Pull a Face', async () =
   await admin.getByRole('button', { name: 'Share to the chat' }).click();
   await admin.getByRole('button', { name: 'Pens away' }).click();
 
+  // Alex mutes Mia and stops her drawing. Her buttons lock, a note says
+  // why, and Alex's tablet stops playing her sound too.
+  await admin.getByRole('button', { name: 'Kids' }).click();
+  const kids = admin.getByRole('group', { name: 'Kids in the call' });
+  await kids.getByRole('button', { name: 'Mute Mia' }).click();
+  await kids.getByRole('button', { name: 'Stop drawing for Mia' }).click();
+  await expect(kid.locator('.call-banner-rule')).toHaveText('Alex muted you and put your pens away for now.');
+  const kidMute = kid.getByRole('button', { name: /^Muted/ });
+  await expect(kidMute).toBeVisible();
+  await expect(admin.locator('.tile:not([data-self]) .tile-muted')).toBeVisible();
+  await expect(admin.locator('.tile:not([data-self]) video')).toHaveJSProperty('muted', true);
+  await kid.getByRole('button', { name: /^No drawing/ }).click();
+  await expect(kid.locator('.call-banner-rule[data-nudged]')).toBeVisible();
+  await expect(kid.locator('.ink-tray')).toHaveCount(0);
+  await kidMute.click();
+  await expect(kidMute).toBeVisible();
+  await shot(admin, '23a-call-kids');
+  await shot(kid, '23b-phone-call-muted');
+  await kids.getByRole('button', { name: 'Unmute Mia' }).click();
+  await kids.getByRole('button', { name: 'Allow drawing for Mia' }).click();
+  await expect(kid.locator('.call-banner-rule')).toHaveText('You can talk and draw again.');
+  await expect(kid.getByRole('button', { name: 'Mute', exact: true })).toBeVisible();
+  await expect(kid.getByRole('button', { name: 'Draw', exact: true })).toBeVisible();
+  await expect(admin.locator('.tile:not([data-self]) video')).toHaveJSProperty('muted', false);
+  await admin.getByRole('button', { name: 'Kids' }).click();
+
   // Pull a Face: both cameras take a photo.
   await admin.getByRole('button', { name: 'Play a game' }).click();
   await admin.getByRole('button', { name: /Pull a Face/ }).click();

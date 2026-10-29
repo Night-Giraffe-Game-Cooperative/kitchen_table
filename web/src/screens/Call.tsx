@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { CallSession, type CallError, type CallSnapshot } from '../lib/call';
+import { CallSession, noRules, type CallError, type CallSnapshot } from '../lib/call';
 import { useStore } from '../lib/store';
 import { whoCanChange } from '../lib/permissions';
 import { go } from '../lib/router';
@@ -31,6 +31,7 @@ const emptySnapshot: CallSnapshot = {
   inkCount: 0,
   myInk: 0,
   idea: null,
+  rules: noRules,
 };
 
 const noSubscribe = () => () => {};
@@ -45,6 +46,7 @@ export function CallScreen({ roomId }: { roomId: number }) {
   const [picking, setPicking] = useState(false);
   const [reacting, setReacting] = useState(false);
   const [inking, setInking] = useState(false);
+  const [minding, setMinding] = useState(false);
   const [ink, setInk] = useState<InkSettings>(defaultInk);
   const [needsTap, setNeedsTap] = useState(false);
   const now = useNow();
@@ -91,6 +93,39 @@ export function CallScreen({ roomId }: { roomId: number }) {
     return () => observer.disconnect();
   }, [count]);
 
+  // What a grown-up has set for me: muted, or pens away, and by whom.
+  const mutedBy = snap.rules.muted[me.id];
+  const pensBy = snap.rules.noPens[me.id];
+  const nameOf = (id: number) => people.get(id)?.name ?? 'A grown-up';
+  const held =
+    mutedBy && pensBy
+      ? `${nameOf(mutedBy)} muted you and ${mutedBy === pensBy ? '' : `${nameOf(pensBy)} `}put your pens away for now.`
+      : mutedBy
+        ? `${nameOf(mutedBy)} muted you for now.`
+        : pensBy
+          ? `${nameOf(pensBy)} put your pens away for now.`
+          : null;
+  // When a grown-up lets me again, a note says so for a few seconds.
+  const [freed, setFreed] = useState<{ talk: boolean; draw: boolean } | null>(null);
+  // Tapping a locked button gives the note a wiggle.
+  const [nudged, setNudged] = useState(0);
+  const told = useRef<{ mutedBy?: number; pensBy?: number }>({});
+  useEffect(() => {
+    const before = told.current;
+    told.current = { mutedBy, pensBy };
+    if (pensBy) setInking(false);
+    const talk = !mutedBy && !!before.mutedBy;
+    const draw = !pensBy && !!before.pensBy;
+    if (talk || draw) setFreed((f) => ({ talk: talk || (!mutedBy && !!f?.talk), draw: draw || (!pensBy && !!f?.draw) }));
+    else if (mutedBy || pensBy) setFreed(null);
+  }, [mutedBy, pensBy]);
+  useEffect(() => {
+    if (!freed) return;
+    const t = window.setTimeout(() => setFreed(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [freed]);
+  const freedNote = freed && (freed.talk && freed.draw ? 'You can talk and draw again.' : freed.talk ? 'You can talk again.' : 'You can draw again.');
+
   const leave = () => go({ name: 'chats', roomId });
 
   if (snap.error === 'no-calls' || snap.error === 'forbidden' || snap.error === 'closed') {
@@ -122,6 +157,13 @@ export function CallScreen({ roomId }: { roomId: number }) {
   const drawerName = (s: InkStroke) =>
     s.by !== me.id && s.live && Date.now() - (s.at ?? 0) < 3000 ? (people.get(s.by)?.name ?? null) : null;
   const names = [...inCall].map((id) => (id === me.id ? me.name : (people.get(id)?.name ?? ''))).filter(Boolean);
+  // The kids in the call, for a grown-up to mute or stop drawing.
+  const kids = me.role === 'kid' ? [] : [...inCall].map((id) => people.get(id)).filter((p): p is Person => p?.role === 'kid');
+  const closeTrays = () => {
+    setInking(false);
+    setReacting(false);
+    setMinding(false);
+  };
 
   const tiles = [
     <Tile
@@ -151,7 +193,8 @@ export function CallScreen({ roomId }: { roomId: number }) {
         person={people.get(p.userId)}
         label={people.get(p.userId)?.name ?? 'Someone'}
         camera={p.camera}
-        micMuted={p.muted}
+        micMuted={p.muted || !!snap.rules.muted[p.userId]}
+        hushed={!!snap.rules.muted[p.userId]}
         connected={p.connected}
         tilt={i % 2 ? 1 : -1}
         onBlocked={() => setNeedsTap(true)}
@@ -172,6 +215,12 @@ export function CallScreen({ roomId }: { roomId: number }) {
 
       {snap.error && snap.error !== 'lost' && <CameraHelp error={snap.error} httpsPort={httpsPort} />}
       {snap.error === 'lost' && <div className="call-banner">Reconnecting to the call…</div>}
+      {(held || freedNote) && (
+        <div key={nudged} className="call-banner call-banner-rule" data-nudged={nudged || undefined} role="status">
+          <Icon name={held ? 'lock' : 'check'} size={18} />
+          <span>{held ?? freedNote}</span>
+        </div>
+      )}
       {needsTap && (
         <button
           type="button"
@@ -246,13 +295,16 @@ export function CallScreen({ roomId }: { roomId: number }) {
         <InkTray settings={ink} onChange={setInk} session={session} snap={snap} names={names} room={room} people={people} me={me} />
       )}
 
+      {minding && session && kids.length > 0 && <KidsTray session={session} snap={snap} kids={kids} />}
+
       <footer className="call-controls" aria-label="Call controls">
         <CallButton
           icon={snap.muted ? 'mic-off' : 'mic'}
-          label={snap.muted ? 'Unmute' : 'Mute'}
+          label={mutedBy ? 'Muted' : snap.muted ? 'Unmute' : 'Mute'}
           pressed={snap.muted}
+          locked={!!mutedBy}
           disabled={!snap.hasAudio}
-          onClick={() => session?.setMuted(!snap.muted)}
+          onClick={() => (mutedBy ? setNudged((n) => n + 1) : session?.setMuted(!snap.muted))}
         />
         <CallButton
           icon={snap.camera ? 'video' : 'video-off'}
@@ -264,11 +316,13 @@ export function CallScreen({ roomId }: { roomId: number }) {
         {snap.canFlip && <CallButton icon="flip" label="Flip camera" onClick={() => session?.flip()} />}
         <CallButton
           icon="marker"
-          label={inking ? 'Pens away' : 'Draw'}
+          label={pensBy ? 'No drawing' : inking ? 'Pens away' : 'Draw'}
           pressed={inking}
+          locked={!!pensBy}
           onClick={() => {
-            setInking((d) => !d);
-            setReacting(false);
+            if (pensBy) return setNudged((n) => n + 1);
+            closeTrays();
+            setInking(!inking);
           }}
         />
         <CallButton
@@ -277,8 +331,8 @@ export function CallScreen({ roomId }: { roomId: number }) {
           pressed={reacting}
           steady
           onClick={() => {
-            setReacting((r) => !r);
-            setInking(false);
+            closeTrays();
+            setReacting(!reacting);
           }}
         />
         <CallButton
@@ -290,6 +344,18 @@ export function CallScreen({ roomId }: { roomId: number }) {
             setPicking((p) => !p);
           }}
         />
+        {kids.length > 0 && (
+          <CallButton
+            icon="shield"
+            label="Kids"
+            pressed={minding}
+            steady
+            onClick={() => {
+              closeTrays();
+              setMinding(!minding);
+            }}
+          />
+        )}
         <CallButton icon="phone-down" label="Leave" tone="danger" onClick={leave} />
       </footer>
     </div>
@@ -308,6 +374,7 @@ function Tile({
   mirrored,
   camera,
   micMuted,
+  hushed,
   connected,
   tilt = 0,
   onBlocked,
@@ -323,6 +390,8 @@ function Tile({
   mirrored?: boolean;
   camera: boolean;
   micMuted: boolean;
+  /** Muted by a grown-up, so this device doesn't play their sound either. */
+  hushed?: boolean;
   connected: boolean;
   tilt?: number;
   onBlocked: () => void;
@@ -345,7 +414,7 @@ function Tile({
       style={{ '--tilt': `${tilt * 0.8}deg` } as CSSProperties}
     >
       <div className="tile-photo">
-        <video ref={video} autoPlay playsInline muted={self} data-mirrored={mirrored || undefined} />
+        <video ref={video} autoPlay playsInline muted={self || hushed} data-mirrored={mirrored || undefined} />
         {!camera && (
           <span className="tile-avatar">
             <Avatar person={person} size="xl" />
@@ -373,6 +442,7 @@ function CallButton({
   onClick,
   pressed,
   steady,
+  locked,
   disabled,
   tone,
 }: {
@@ -382,6 +452,8 @@ function CallButton({
   pressed?: boolean;
   /** The label stays the same either way, so screen readers hear pressed or not; otherwise the label says it. */
   steady?: boolean;
+  /** A grown-up has switched this off for now: it shows a lock, and a tap says why. */
+  locked?: boolean;
   disabled?: boolean;
   tone?: 'danger';
 }) {
@@ -390,15 +462,67 @@ function CallButton({
       type="button"
       className={`call-btn${tone ? ` call-btn-${tone}` : ''}`}
       data-on={pressed || undefined}
+      data-locked={locked || undefined}
       aria-pressed={steady ? !!pressed : undefined}
       disabled={disabled}
       onClick={onClick}
     >
       <span className="call-btn-face">
         <Icon name={icon} size={24} />
+        {locked && (
+          <span className="call-btn-lock">
+            <Icon name="lock" size={13} />
+          </span>
+        )}
       </span>
       <span className="call-btn-label">{label}</span>
+      {locked && <span className="sr-only"> (a grown-up switched this off)</span>}
     </button>
+  );
+}
+
+/** For grown-ups: mute the kids in the call or stop them drawing, one at a time or all together, and let them again. */
+function KidsTray({ session, snap, kids }: { session: CallSession; snap: CallSnapshot; kids: Person[] }) {
+  const muted = (k: Person) => !!snap.rules.muted[k.id];
+  const penless = (k: Person) => !!snap.rules.noPens[k.id];
+  const ids = kids.map((k) => k.id);
+  const allMuted = kids.every(muted);
+  const allPenless = kids.every(penless);
+  return (
+    <div className="ink-tray kids-tray" role="group" aria-label="Kids in the call">
+      <ul className="kids-list">
+        {kids.map((k) => (
+          <li key={k.id} className="kids-row">
+            <span className="kids-name">
+              <Avatar person={k} size="sm" /> {k.name}
+            </span>
+            <button type="button" className="ink-action" data-held={muted(k) || undefined} onClick={() => session.setRule('mute', [k.id], !muted(k))}>
+              <Icon name={muted(k) ? 'mic' : 'mic-off'} size={18} /> {muted(k) ? 'Unmute' : 'Mute'}
+              <span className="sr-only"> {k.name}</span>
+            </button>
+            <button type="button" className="ink-action" data-held={penless(k) || undefined} onClick={() => session.setRule('pens', [k.id], !penless(k))}>
+              <Icon name="marker" size={18} /> {penless(k) ? 'Allow drawing' : 'Stop drawing'}
+              <span className="sr-only"> for {k.name}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="ink-actions">
+        {kids.length > 1 && (
+          <>
+            <button type="button" className="ink-action" onClick={() => session.setRule('mute', ids, !allMuted)}>
+              <Icon name={allMuted ? 'mic' : 'mic-off'} size={18} /> {allMuted ? 'Unmute all kids' : 'Mute all kids'}
+            </button>
+            <button type="button" className="ink-action" onClick={() => session.setRule('pens', ids, !allPenless)}>
+              <Icon name="marker" size={18} /> {allPenless ? 'Allow all drawing' : 'Stop all drawing'}
+            </button>
+          </>
+        )}
+        <button type="button" className="ink-action" disabled={!snap.inkCount} onClick={() => session.wipeInk()}>
+          <Icon name="trash" size={18} /> Wipe all drawings
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -119,6 +119,60 @@ defmodule FamilyWeb.CallChannelTest do
     assert_receive %Broadcast{event: "call_changed", payload: %{call: nil}}, 2_000
   end
 
+  test "a grown-up mutes a kid and puts their pens away until they let them again, and kids can't",
+       %{admin: admin, kid: kid, room: room} do
+    @endpoint.subscribe("user:#{admin.id}")
+    {mia_id, dad_id} = {kid.id, admin.id}
+    {:ok, _, dad} = join_call(admin, room, "dad-tablet-1")
+    assert_push "rules", %{muted: none, no_pens: none} when none == %{}
+    {:ok, _, mia} = join_call(kid, room, "mia-tablet")
+
+    # Mia can't mute anyone, and only kids can be muted.
+    ref = push(mia, "rule", %{"rule" => "mute", "user_ids" => [mia_id], "on" => true})
+    assert_reply ref, :error, %{reason: "forbidden"}
+    ref = push(dad, "rule", %{"rule" => "mute", "user_ids" => [dad_id], "on" => true})
+    assert_reply ref, :error, %{reason: "forbidden"}
+
+    ref = push(dad, "rule", %{"rule" => "mute", "user_ids" => [mia_id], "on" => true})
+    assert_reply ref, :ok
+    assert_broadcast "rules", %{muted: %{^mia_id => ^dad_id}}
+
+    # Muted stays muted, whatever Mia's tablet says.
+    push(mia, "state", %{"muted" => false, "camera" => true})
+    Process.sleep(50)
+    assert %{"mia-tablet" => %{metas: [%{muted: true}]}} = FamilyWeb.Presence.list("call:#{room.id}")
+
+    # With her pens away, Mia's drawings and wipes go nowhere.
+    ref = push(dad, "rule", %{"rule" => "pens", "user_ids" => [mia_id], "on" => true})
+    assert_reply ref, :ok
+    assert_broadcast "rules", %{muted: %{^mia_id => _}, no_pens: %{^mia_id => ^dad_id}}
+    stroke = %{"id" => "mia-tablet-1", "on" => "dad-tablet-1", "kind" => "pen", "colour" => "#e5383b", "size" => 0.025}
+    push(mia, "ink", Map.merge(stroke, %{"i" => 0, "p" => [0.4, 0.5], "done" => true}))
+    push(mia, "ink_wipe", %{})
+    push(mia, "ink_idea", %{"text" => "Give Dad a moustache"})
+    refute_broadcast "ink", _, 100
+    refute_broadcast "ink_wipe", _
+    refute_broadcast "ink_idea", _
+    assert Calls.ink(room.id) == []
+
+    # Coming back into the call doesn't clear them.
+    hang_up(mia)
+    {:ok, _, mia} = join_call(kid, room, "mia-tablet-2")
+    assert_push "rules", %{muted: %{^mia_id => _}, no_pens: %{^mia_id => _}}
+    assert %{"mia-tablet-2" => %{metas: [%{muted: true}]}} = FamilyWeb.Presence.list("call:#{room.id}")
+
+    # Dad lets her draw again; she's still muted.
+    ref = push(dad, "rule", %{"rule" => "pens", "user_ids" => [mia_id], "on" => false})
+    assert_reply ref, :ok
+    assert_broadcast "rules", %{muted: %{^mia_id => _}, no_pens: none} when none == %{}
+    push(mia, "ink", Map.merge(stroke, %{"id" => "mia-tablet-2-1", "i" => 0, "p" => [0.4, 0.5], "done" => true}))
+    assert_broadcast "ink", %{"id" => "mia-tablet-2-1"}
+
+    hang_up(dad)
+    hang_up(mia)
+    assert_receive %Broadcast{event: "call_changed", payload: %{call: nil}}, 2_000
+  end
+
   test "people without video calls, or outside the chat, can't join", %{admin: admin, kid: kid, room: room} do
     {:ok, kid} = Accounts.set_permissions(admin, kid, %{"video_calls" => false}, nil)
     assert {:error, %{reason: "no_calls"}} = join_call(kid, room, "mia-tablet")

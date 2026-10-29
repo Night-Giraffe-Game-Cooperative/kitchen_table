@@ -100,11 +100,19 @@ defmodule FamilyWeb.CallChannel do
   passes connection offers and answers between devices (the video itself goes
   straight between them), shares who is muted, and carries the games played
   in the call.
+
+  A grown-up in the call can mute a kid, or put a kid's pens away. The kid's
+  microphone goes off and stays off until a grown-up lets them talk again,
+  and everyone else's device stops playing their sound too, so it holds even
+  on a device that hasn't caught up. Drawings from a kid whose pens are away
+  aren't passed on.
   """
   use FamilyWeb, :channel
   require Logger
-  alias Family.{Calls, Chat, Permissions}
+  alias Family.{Accounts, Calls, Chat, Permissions}
   alias FamilyWeb.Presence
+
+  intercept ["rules"]
 
   @max_signal 64_000
   @max_snap 400_000
@@ -137,15 +145,18 @@ defmodule FamilyWeb.CallChannel do
 
   @impl true
   def handle_info(:after_join, socket) do
+    socket = assign(socket, :rules, Calls.rules(socket.assigns.room_id))
+
     {:ok, _} =
       Presence.track(socket, socket.assigns.peer, %{
         user_id: socket.assigns.user_id,
-        muted: false,
+        muted: held?(socket, :muted),
         camera: true,
         since: System.system_time(:millisecond)
       })
 
     push(socket, "presence_state", Presence.list(socket))
+    push(socket, "rules", socket.assigns.rules)
     if game = Calls.game(socket.assigns.room_id), do: push(socket, "game", %{game: game})
 
     case Calls.ink(socket.assigns.room_id) do
@@ -167,9 +178,11 @@ defmodule FamilyWeb.CallChannel do
   end
 
   def handle_in("state", payload, socket) do
+    hushed = held?(socket, :muted)
+
     Presence.update(socket, socket.assigns.peer, fn meta ->
       meta
-      |> Map.put(:muted, payload["muted"] == true)
+      |> Map.put(:muted, payload["muted"] == true or hushed)
       |> Map.put(:camera, payload["camera"] != false)
     end)
 
@@ -203,7 +216,8 @@ defmodule FamilyWeb.CallChannel do
   # points of one while it's being drawn. A finished one is kept for late
   # joiners.
   def handle_in("ink", payload, socket) do
-    with {:ok, ink} <- clean_ink(payload, socket.assigns.peer) do
+    with false <- held?(socket, :no_pens),
+         {:ok, ink} <- clean_ink(payload, socket.assigns.peer) do
       ink = Map.put(ink, "by", socket.assigns.user_id)
       broadcast_from(socket, "ink", ink)
 
@@ -227,14 +241,34 @@ defmodule FamilyWeb.CallChannel do
   end
 
   def handle_in("ink_wipe", _, socket) do
-    Calls.wipe_ink(socket.assigns.room_id)
-    broadcast_from(socket, "ink_wipe", %{by: socket.assigns.user_id})
+    unless held?(socket, :no_pens) do
+      Calls.wipe_ink(socket.assigns.room_id)
+      broadcast_from(socket, "ink_wipe", %{by: socket.assigns.user_id})
+    end
+
     {:noreply, socket}
   end
 
   def handle_in("ink_idea", %{"text" => text}, socket) when is_binary(text) and byte_size(text) <= 200 do
-    broadcast(socket, "ink_idea", %{text: text, by: socket.assigns.user_id})
+    unless held?(socket, :no_pens), do: broadcast(socket, "ink_idea", %{text: text, by: socket.assigns.user_id})
     {:noreply, socket}
+  end
+
+  # A grown-up mutes kids in the call or puts their pens away ("mute" or
+  # "pens", with on true), or lets them again. Kids can't, and only kids can
+  # be.
+  def handle_in("rule", %{"rule" => rule, "user_ids" => ids, "on" => on}, socket)
+      when rule in ["mute", "pens"] and is_list(ids) and length(ids) <= 50 and is_boolean(on) do
+    user = FamilyWeb.UserSocket.current_user(socket)
+    kids = for id <- Enum.uniq(ids), is_integer(id), kid = Accounts.get_user(id), kid.role == "kid", do: id
+
+    with true <- user != nil and user.role != "kid" and kids != [],
+         {:ok, rules} <- Calls.put_rule(socket.assigns.room_id, if(rule == "mute", do: :muted, else: :no_pens), kids, on, user.id) do
+      broadcast(socket, "rules", rules)
+      {:reply, :ok, socket}
+    else
+      _ -> {:reply, {:error, %{reason: "forbidden"}}, socket}
+    end
   end
 
   # When two devices can't connect, each says what it could see, for the log.
@@ -244,6 +278,16 @@ defmodule FamilyWeb.CallChannel do
   end
 
   def handle_in(_, _, socket), do: {:noreply, socket}
+
+  # Every device keeps the call's rules to hand, so drawings can be checked
+  # without asking the call each time.
+  @impl true
+  def handle_out("rules", rules, socket) do
+    push(socket, "rules", rules)
+    {:noreply, assign(socket, :rules, rules)}
+  end
+
+  defp held?(socket, rule), do: Map.has_key?(socket.assigns[:rules][rule] || %{}, socket.assigns.user_id)
 
   defp clean_ink(%{"id" => id, "on" => on, "kind" => kind, "colour" => colour, "size" => size, "i" => i, "p" => p} = m, peer)
        when is_binary(id) and byte_size(id) <= 96 and is_binary(on) and byte_size(on) <= 64 and kind in ["pen", "sticker"] and

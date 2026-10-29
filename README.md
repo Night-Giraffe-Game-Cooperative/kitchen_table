@@ -124,7 +124,10 @@ scribbles, moustaches, clown noses, crowns, with an Idea button for silly
 suggestions and Save a picture to keep it in the chat. Drawings stick to the
 person's face on every screen. There are games to play in the call too: Pull
 a Face (everyone's camera snaps the same silly face; give stars), Act It Out
-(charades with a timer) and Draw Together. The pictures and sound go straight
+(charades with a timer) and Draw Together. A grown-up in the call can mute a
+kid or stop them drawing, one at a time or all together, from the Kids
+button; the kid sees a padlock and who did it until a grown-up lets them
+again, and wiping the drawings is there too. The pictures and sound go straight
 between the devices; the server only introduces them. It suits up to about six
 people.
 
@@ -361,7 +364,8 @@ docs/     the getting going guide, and design notes with the decision log
 - **Calls go device to device.** Video calls are a WebRTC mesh; the server
   only introduces the devices, keeps who's in each call, rings the chat and
   holds the shared drawings, stored in camera-picture coordinates so a
-  moustache stays under the same nose on every screen.
+  moustache stays under the same nose on every screen, and the grown-ups'
+  rules (who's muted, whose pens are away).
 - **Who may talk to whom** is one module, `Family.Contacts`, checked for every
   chat, group, message, game and call.
 - **Calendars and notifications** use open standards where there are any:
