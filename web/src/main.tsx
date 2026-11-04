@@ -6,7 +6,6 @@ import './styles/versus.css';
 import './styles/call.css';
 import './styles/drawing.css';
 import './styles/calendar.css';
-import './styles/learn.css';
 import './styles/games/giraffe.css';
 import './styles/games/family-quiz.css';
 import './styles/games/pairs.css';

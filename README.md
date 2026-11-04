@@ -189,37 +189,12 @@ The New game list puts the games on five shelves.
 | **Just for you** | |
 | Bonsai | A little tree of your own (maple, pine or cherry blossom), painted in watercolour. Water it, trim it, feed it and sweep up its leaves a few minutes a day; it grows and changes with the real seasons, visitors drop by (some nights the Night Giraffe), and looking after it unlocks pots and things to put beside it. Nobody else sees it, and it never dies |
 
-**Learn.** Phrases and characters for a family holiday, in Japanese or French.
-Phrases come in topics (hello and goodbye, manners, food, getting around,
-shops, help, numbers), each with the words, how to say them in English
-sounds, and a speaker to hear them, slowly too. Signs to spot (exit, toilets,
-open, closed) are their own tab, and Japanese adds hiragana and katakana: a
-chart to tap and hear, and a quiz. Everyone presses "I know it" on what
-they've learned, and the family can see who knows what, so learning it is a
-shared thing. There's a phrase of the day, flashcards that start with what
-you don't know yet, and an age choice: 5 to 7 keeps to the simplest
-phrases, and older ages add more. Every phrase, sign and kana sound has a
-recording, normal and slow, made with [Kokoro](https://github.com/hexgrad/kokoro),
-an open voice model (Apache 2.0), so it sounds natural and needs no voice
-installed on the device. Anything without a recording yet is read by the
-device's own voice, as on the Android app (see
-[part 5 of Get going](docs/getting-started.md#5-the-android-app-for-kids-tablets)).
-
-A grown-up can set when the family goes, and then Learn counts the sleeps
-until the holiday for everyone at home, with a new fact about Japan each
-day.
-
-Japanese also has a Travel tab. Spot it is a bingo card of sixteen things to
-find on the trip (a shrine gate, a deer in Nara, a toilet with buttons):
-everyone ticks what they spot, sees whose faces are on each square, and four
-in a row is bingo. Bullet trains are for everyone: the
-words in their own topic, station signs (ticket gates, platform, carriage,
-reserved seats), what's good to know (where to queue, which side for Mount
-Fuji, big suitcases) and a quiz. Driving is for grown-ups only: Japan's road
-signs drawn as you'll see them, with what each means and how it differs from
-home, the rules that catch visitors out, and a ten-question road test with
-the real test's pass mark of 90%. Passing the quiz or the test shows on the
-family's progress.
+**Extras.** Optional parts of the app, which an admin switches on for
+everyone under Extras on the Family page. A new family starts with them off,
+and one that's off isn't in the menu or downloaded. So far there's one:
+Learn, Japanese and French for a family holiday, with phrases, signs and
+characters to learn together, travel games and a countdown to the trip (see
+[its own notes](web/src/modules/learn/README.md)).
 
 **Calendar and tasks.** A family calendar with Today, Month, Week, Homework
 and Rewards views. Events can be all day or timed, run over several days,
@@ -368,6 +343,9 @@ docs/     the getting going guide, and design notes with the decision log
   rules (who's muted, whose pens are away).
 - **Who may talk to whom** is one module, `Family.Contacts`, checked for every
   chat, group, message, game and call.
+- **Extras are modules.** Each optional part keeps to its own folder in
+  `web/src/modules`, loaded only when it's switched on, and its own server
+  code (Learn is `Family.Learn`); `Family.Modules` says which are on.
 - **Calendars and notifications** use open standards where there are any:
   CalDAV and iCalendar for linked calendars, Web Push (RFC 8291 and 8292) on
   the standard library's crypto for notifications. Google and Outlook

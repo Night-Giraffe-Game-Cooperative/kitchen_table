@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
-import { useStore } from '../lib/store';
-import type { Person } from '../lib/types';
-import { Avatar, Button, Field, IconButton, Input, Notice, Segmented } from '../components/ui';
-import { InfoTip } from '../components/tips';
-import { errorText, useLive } from './tasksShared';
-import { BANDS, bandLabel, defaultBand, rememberBand, type Band } from '../games/bands';
-import { canSpeak, hasVoice, playClip, speakIn } from '../lib/speech';
-import { shuffle } from '../games/common';
-import { ROAD_TEST, TRAIN_QUIZ, roadSigns } from '../learn/japanTravel';
-import { factFor, sleepsUntil, spots } from '../learn/japanFun';
+import { api } from '../../lib/api';
+import { useStore } from '../../lib/store';
+import type { Person } from '../../lib/types';
+import { Avatar, Button, Field, IconButton, Input, Notice, Segmented } from '../../components/ui';
+import { InfoTip } from '../../components/tips';
+import { errorText, useLive } from '../../screens/tasksShared';
+import { BANDS, bandLabel, defaultBand, rememberBand, type Band } from '../../games/bands';
+import { canSpeak, hasVoice, playClip, speakIn } from '../../lib/speech';
+import { shuffle } from '../../games/common';
+import { ROAD_TEST, TRAIN_QUIZ, roadSigns } from './japanTravel';
+import { factFor, sleepsUntil, spots } from './japanFun';
 import { Faces, Travel } from './LearnTravel';
 import {
   allPhrases,
@@ -25,8 +25,9 @@ import {
   type Level,
   type Phrase,
   type Script,
-} from '../learn/phrases';
-import { hasClips, kanaClip, phraseClip } from '../learn/voices';
+} from './phrases';
+import { hasClips, kanaClip, phraseClip } from './voices';
+import './learn.css';
 
 // Learning a language together for a holiday: phrases to say, signs to spot,
 // and for Japanese the characters. Everyone marks what they know, and the

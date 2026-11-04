@@ -14,7 +14,8 @@ defmodule FamilyWeb.MeController do
       reactions: Family.Chat.reaction_emoji(),
       colours: Family.Accounts.User.colours(),
       ice_servers: Application.get_env(:family, :ice_servers, []),
-      https_port: Application.get_env(:family, :https_port)
+      https_port: Application.get_env(:family, :https_port),
+      modules: Family.Modules.enabled()
     })
   end
 

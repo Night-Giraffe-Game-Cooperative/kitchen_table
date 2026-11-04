@@ -5,7 +5,7 @@ import { startFakeCaldav } from './fixtures/fakeCaldav';
 import { googleClient, microsoftClient, startFakeConnect } from './fixtures/fakeConnect';
 import { startFakePush } from './fixtures/fakePush';
 import { spills, type Spill } from './fixtures/spills';
-import { roadRules, roadSigns, trainQuestions } from '../src/learn/japanTravel';
+import { roadRules, roadSigns, trainQuestions } from '../src/modules/learn/japanTravel';
 
 // One family, start to finish: the first admin sets up, adds a kid and a
 // grown-up, they sign in with one-time passwords, chat, share and doodle on a
@@ -1336,6 +1336,17 @@ test('a kid with no email signs in with a code a grown-up makes', async ({ brows
 });
 
 test('Learn: holiday phrases in Japanese and French, learned as a family', async () => {
+  // Learn is an extra, off for a new family until an admin switches it on.
+  await kid.goto('/#/learn');
+  await expect(kid.getByRole('heading', { name: 'Learn is switched off' })).toBeVisible();
+  await expect(kid.getByRole('link', { name: /^Learn\b/ })).toHaveCount(0);
+  await admin.goto('/#/people');
+  const extras = admin.getByRole('region', { name: 'Extras' });
+  await extras.getByRole('switch', { name: 'Learn' }).click();
+  await expect(extras.getByRole('switch', { name: 'Learn' })).toHaveAttribute('aria-checked', 'true');
+  await shot(admin, '69a-extras');
+  await expect(kid.getByRole('link', { name: /^Learn\b/ }).first()).toBeVisible();
+
   await admin.goto('/#/chats');
   await admin.getByRole('link', { name: /^Learn\b/ }).click();
   await expect(admin.getByRole('heading', { name: 'Learn', level: 1 })).toBeVisible();

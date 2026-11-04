@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useStore, type Toast } from '../lib/store';
 import { href, useRoute, type Route } from '../lib/router';
 import { Icon, type IconName } from '../components/icons';
-import { Avatar } from '../components/ui';
+import { Avatar, EmptyState } from '../components/ui';
+import { moduleDefs } from '../modules';
 import { Chats } from './Chats';
 import { GamesHub } from './Games';
-import { Learn } from './Learn';
 import { CalendarScreen, seesCalendar } from './Calendar';
 import { switchedOffBy } from '../lib/permissions';
 import { People } from './People';
@@ -20,7 +20,7 @@ import { waitingOnMe } from '../lib/contacts';
 
 export function Shell() {
   const route = useRoute();
-  const { me, appName, rooms, games, bubbles, people, friendships, connected, toasts, dismissToast } = useStore();
+  const { me, appName, rooms, games, bubbles, people, friendships, connected, modules, toasts, dismissToast } = useStore();
 
   const unread = rooms.reduce((n, r) => n + r.unread, 0);
   const myTurns = games.filter((g) => isMyTurn(g, me.id)).length;
@@ -38,7 +38,7 @@ export function Shell() {
   const nav: { route: Route; label: string; icon: IconName; badge?: number; badgeText?: string }[] = [
     { route: { name: 'chats' }, label: 'Chats', icon: 'chat', badge: unread },
     ...(!switchedOffBy(myBubble, 'play_games') ? [{ route: { name: 'games' } as Route, label: 'Games', icon: 'games' as IconName, badge: myTurns }] : []),
-    { route: { name: 'learn' }, label: 'Learn', icon: 'globe' },
+    ...moduleDefs.filter((m) => modules.includes(m.id)).map((m) => ({ route: { name: m.id } as Route, label: m.label, icon: m.icon })),
     ...(seesCalendar(me)
       ? [{ route: { name: 'calendar' } as Route, label: 'Calendar', icon: 'calendar' as IconName }]
       : me.permissions.tasks
@@ -49,6 +49,7 @@ export function Shell() {
   ];
 
   const current = route.name === 'outbox' ? 'people' : route.name;
+  const mod = moduleDefs.find((m) => m.id === route.name);
 
   if (route.name === 'call') {
     return (
@@ -111,7 +112,7 @@ export function Shell() {
         )}
         {route.name === 'chats' && <Chats roomId={route.roomId} />}
         {route.name === 'games' && <GamesHub gameId={route.gameId} />}
-        {route.name === 'learn' && <Learn />}
+        {mod && <ModuleScreen mod={mod} on={modules.includes(mod.id)} />}
         {route.name === 'calendar' && <CalendarScreen view={route.view} linkAccount={route.linkAccount} />}
         {route.name === 'people' && <People personId={route.personId} />}
         {route.name === 'outbox' && <Outbox />}
@@ -123,6 +124,22 @@ export function Shell() {
       <ConfirmHost />
       <Toasts toasts={toasts} dismissToast={dismissToast} />
     </div>
+  );
+}
+
+/** An optional module's screen, loaded the first time it's opened, or a note if it's switched off. */
+function ModuleScreen({ mod, on }: { mod: (typeof moduleDefs)[number]; on: boolean }) {
+  if (!on) {
+    return (
+      <EmptyState art="🧩" title={`${mod.label} is switched off`}>
+        <p>An admin can switch it on under Extras on the Family page.</p>
+      </EmptyState>
+    );
+  }
+  return (
+    <Suspense fallback={<p className="muted module-loading">Opening {mod.label}…</p>}>
+      <mod.Screen />
+    </Suspense>
   );
 }
 

@@ -10,6 +10,7 @@ import { Avatar, Button, Dialog, EmptyState, Field, IconButton, Input, Notice, R
 import { InfoTip } from '../components/tips';
 import { Icon } from '../components/icons';
 import { confirmFirst } from '../components/confirm';
+import { moduleDefs } from '../modules';
 
 export const avatars = ['🙂', '😎', '🦒', '🐶', '🐻', '🦄', '🐱', '🦊', '🐼', '🐸', '🦁', '🐯', '🐧', '🦉', '🐙', '🦖', '🌻', '🌈', '⭐', '🚀', '⚽', '🎸', '👑', '🧁'];
 
@@ -75,6 +76,7 @@ export function People({ personId }: { personId?: number }) {
             <PersonList people={members} selected={personId} />
           </div>
         ))}
+        {me.role === 'admin' && <Extras />}
         {isAdmin && (
           <div className="admin-links">
             <a className="outbox-link" href="#/outbox">
@@ -98,6 +100,34 @@ export function People({ personId }: { personId?: number }) {
       {isAdmin && <AddPerson open={adding} onClose={() => setAdding(false)} />}
       {changing && <BubbleSettings bubble={changing} onClose={() => setChanging(null)} />}
     </div>
+  );
+}
+
+/** For admins: the optional parts of the app, switched on or off for everyone. */
+function Extras() {
+  const { modules, toast } = useStore();
+  const [saving, setSaving] = useState(false);
+
+  async function change(id: string, on: boolean) {
+    setSaving(true);
+    try {
+      await api.put(`/api/modules/${id}`, { on });
+    } catch (e) {
+      toast((e as Error).message, 'danger');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="extras" aria-labelledby="extras-head">
+      <h2 id="extras-head" className="section-label">
+        Extras
+      </h2>
+      {moduleDefs.map((m) => (
+        <Toggle key={m.id} label={m.label} hint={m.blurb} checked={modules.includes(m.id)} disabled={saving} onChange={(on) => change(m.id, on)} />
+      ))}
+    </section>
   );
 }
 

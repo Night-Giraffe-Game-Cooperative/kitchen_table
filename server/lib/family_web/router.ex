@@ -117,9 +117,12 @@ defmodule FamilyWeb.Router do
         patch "/goals/:id", RewardController, :update_goal
         delete "/goals/:id", RewardController, :delete_goal
 
-        get "/phrases", PhraseController, :index
-        put "/phrases/known", PhraseController, :mark
-    put "/phrases/trip", PhraseController, :trip
+        put "/modules/:name", ModuleController, :update
+
+        # Learn, an optional module.
+        get "/phrases", LearnController, :index
+        put "/phrases/known", LearnController, :mark
+        put "/phrases/trip", LearnController, :trip
       end
     end
   end

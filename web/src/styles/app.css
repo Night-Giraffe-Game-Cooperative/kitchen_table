@@ -1185,6 +1185,18 @@ button {
   color: var(--muted);
 }
 
+/* For admins: the optional modules, switched on for everyone. */
+.extras {
+  display: grid;
+  gap: 0.25rem;
+  margin: 1.25rem 0.75rem 0;
+}
+
+.module-loading {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
 .admin-links {
   display: grid;
   justify-items: start;

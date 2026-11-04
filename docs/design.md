@@ -671,3 +671,17 @@ drops drawings from a kid whose pens are away. The kid sees a note at the
 top saying who did it, and a tap on a locked button gives the note a
 wiggle. When a grown-up lets them again, the microphone goes back to how
 the kid had it, and a note says they can talk or draw again.
+
+4 Nov 2026. Learn became an optional module, an "extra". Asked for because
+it's a bit specific for the main app: most families won't be learning
+Japanese for a holiday. Everything of Learn's moved to its own places
+(web/src/modules/learn, Family.Learn and its controller), and the rest of the
+app knows it only through one list of modules and Family.Modules, so another
+extra can slot in the same way. An admin switches extras on for everyone
+under Extras on the Family page, rather than choosing them when the app is
+built, so nobody needs a new release to try one. A new family starts with
+Learn off, a family already using the app kept it on, and when it's off it
+isn't in the menu, its server addresses don't answer, and its code and
+recordings are never downloaded. Switching it off keeps what everyone has
+learned for when it's back.
+

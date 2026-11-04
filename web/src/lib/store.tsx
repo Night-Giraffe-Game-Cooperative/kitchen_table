@@ -20,6 +20,8 @@ interface Session {
   colours: string[];
   ice_servers?: RTCIceServer[];
   https_port?: number | null;
+  /** The optional modules switched on, like ['learn']. */
+  modules?: string[];
 }
 
 /** Someone has started a call in a chat this person is in. */
@@ -46,6 +48,8 @@ interface Store {
   activeCall: RefObject<number | null>;
   iceServers: RTCIceServer[];
   httpsPort: number | null;
+  /** The optional modules an admin has switched on, like ['learn']. */
+  modules: string[];
   ring: Ring | null;
   dismissRing: () => void;
   setMe: (me: Me) => void;
@@ -85,6 +89,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
   const [online, setOnline] = useState<Set<number>>(new Set());
   const [rooms, setRooms] = useState<Room[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [modules, setModules] = useState<string[]>(session.modules ?? []);
   const [connected, setConnected] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const activeRoom = useRef<number | null>(null);
@@ -242,6 +247,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
       presence.list((id) => ids.add(Number(id)));
       setOnline(ids);
     });
+    family.on('modules_changed', ({ modules }: { modules: string[] }) => setModules(modules));
     family.on('people_changed', ({ id }: { id: number | null }) => {
       refreshPeople().catch(() => {});
       refreshRooms().catch(() => {});
@@ -307,6 +313,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
       activeCall,
       iceServers: session.ice_servers ?? [],
       httpsPort: session.https_port ?? null,
+      modules,
       ring,
       dismissRing,
       setMe,
@@ -319,7 +326,7 @@ export function StoreProvider({ session, onSignedOut, children }: { session: Ses
       dismissToast,
       signOut,
     }),
-    [me, session, people, bubbles, friendships, online, rooms, games, connected, ring, dismissRing, refreshPeople, refreshRooms, refreshGames, markRoomRead, toast, toasts, dismissToast, signOut],
+    [me, session, people, bubbles, friendships, online, rooms, games, connected, modules, ring, dismissRing, refreshPeople, refreshRooms, refreshGames, markRoomRead, toast, toasts, dismissToast, signOut],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

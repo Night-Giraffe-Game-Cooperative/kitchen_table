@@ -1,9 +1,11 @@
-defmodule Family.Phrases do
+defmodule Family.Learn do
   @moduledoc """
-  Learning a language for a holiday: which phrases, signs and characters each
-  person knows, so a family can see how they're getting on together. The
-  phrases themselves live in the web app, and a key names one, like
-  "ja.thank_you", "fr.sign.exit" or "ja.hira.ka".
+  Learn, an optional module (see Family.Modules): learning a language for a
+  holiday. This keeps which phrases, signs and characters each person knows,
+  so a family can see how they're getting on together, and when each
+  household goes. The phrases themselves live in the web app, in
+  web/src/modules/learn, and a key names one, like "ja.thank_you",
+  "fr.sign.exit" or "ja.hira.ka".
   """
   import Ecto.Query
   alias Family.{Chat, Repo, Settings}

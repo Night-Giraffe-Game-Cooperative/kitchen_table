@@ -207,12 +207,13 @@ them when Android asks. With no push service in the app (and no Google),
 it checks for them itself: about every minute while it's open or in the
 background, otherwise every 15 minutes or so, as Android allows.
 
-Learn reads phrases aloud with the tablet's own text-to-speech voices. Most
-tablets come with English only: for Japanese or French, open Settings,
-search for **Text-to-speech**, choose the engine's settings (the cog by
-Google's, usually), then **Install voice data** and the language. The app
-says so the first time it can't find one. Phones and computers use their
-browser's voices, and Learn says when there isn't one for a language.
+Learn, if an admin has switched it on under Extras on the Family page, plays
+a recording of every phrase, so it needs no voices on the tablet. Only a
+phrase without a recording yet falls back to the tablet's own
+text-to-speech voices. Most tablets come with English only: for Japanese or
+French, open Settings, search for **Text-to-speech**, choose the engine's
+settings (the cog by Google's, usually), then **Install voice data** and the
+language. Phones and computers use their browser's voices.
 
 ## 6. Email
 

@@ -249,26 +249,29 @@ defmodule Family.TasksTest do
   end
 
   test "kids see only their own tasks, and their ticks wait for a grown-up", %{admin: admin, mia: mia, ruby: ruby, jo: jo, sam: sam} do
+    # Recent days, since only the last fortnight's ticks wait to be checked.
+    day = Date.add(Date.utc_today(), -2)
+    next = Date.add(day, 1)
     {:ok, cat} = Tasks.create(jo, teeth([mia.id, ruby.id], %{"title" => "Feed the cat", "stars" => 2}))
     {:ok, rubys} = Tasks.create(jo, teeth([ruby.id], %{"title" => "Tidy up"}))
     {:ok, own} = Tasks.create(mia, teeth([mia.id], %{"title" => "Read"}))
-    :ok = Tasks.tick(ruby, cat.id, ruby.id, ~D[2026-10-20], true)
+    :ok = Tasks.tick(ruby, cat.id, ruby.id, day, true)
 
-    {tasks, done} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
+    {tasks, done} = Tasks.list(mia, day, day)
     assert Enum.map(tasks, &{&1.title, &1.user_ids}) == [{"Feed the cat", [mia.id]}, {"Read", [mia.id]}]
     refute Enum.any?(tasks, &(&1.id == rubys.id))
     assert done == []
-    assert jo |> Tasks.list(~D[2026-10-20], ~D[2026-10-20]) |> elem(0) |> Enum.find(&(&1.id == cat.id)) |> Map.get(:user_ids) == [mia.id, ruby.id]
+    assert jo |> Tasks.list(day, day) |> elem(0) |> Enum.find(&(&1.id == cat.id)) |> Map.get(:user_ids) == [mia.id, ruby.id]
 
     # Mia's tick waits, earning nothing; she can take it back while it does.
-    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], true)
-    assert {_, [%{waiting: true, stars: 0}]} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
-    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], false)
-    assert :ok = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], true)
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, day, true)
+    assert {_, [%{waiting: true, stars: 0}]} = Tasks.list(mia, day, day)
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, day, false)
+    assert :ok = Tasks.tick(mia, cat.id, mia.id, day, true)
 
     # Her own task is hers to tick off for real.
-    assert :ok = Tasks.tick(mia, own.id, mia.id, ~D[2026-10-20], true)
-    assert {_, ticks} = Tasks.list(mia, ~D[2026-10-20], ~D[2026-10-20])
+    assert :ok = Tasks.tick(mia, own.id, mia.id, day, true)
+    assert {_, ticks} = Tasks.list(mia, day, day)
     assert %{waiting: false} = Enum.find(ticks, &(&1.task_id == own.id))
 
     # The grown-ups who look after her check it; not her, not another family.
@@ -276,25 +279,25 @@ defmodule Family.TasksTest do
     assert checks.(jo) == [{cat.id, ruby.id}, {cat.id, mia.id}]
     assert checks.(admin) == checks.(jo)
     assert checks.(sam) == [] and checks.(mia) == []
-    assert {:error, :forbidden} = Tasks.check(mia, cat.id, mia.id, ~D[2026-10-20], true)
-    assert {:error, :forbidden} = Tasks.check(sam, cat.id, mia.id, ~D[2026-10-20], true)
+    assert {:error, :forbidden} = Tasks.check(mia, cat.id, mia.id, day, true)
+    assert {:error, :forbidden} = Tasks.check(sam, cat.id, mia.id, day, true)
 
-    assert :ok = Tasks.check(jo, cat.id, mia.id, ~D[2026-10-20], true)
-    assert {:error, "That's been checked already."} = Tasks.check(jo, cat.id, mia.id, ~D[2026-10-20], true)
+    assert :ok = Tasks.check(jo, cat.id, mia.id, day, true)
+    assert {:error, "That's been checked already."} = Tasks.check(jo, cat.id, mia.id, day, true)
     assert %{stars: 2} = Enum.find(Tasks.rewards(mia), &(&1.user_id == mia.id))
-    assert {:error, "A grown-up has checked this one, so only they can untick it."} = Tasks.tick(mia, cat.id, mia.id, ~D[2026-10-20], false)
+    assert {:error, "A grown-up has checked this one, so only they can untick it."} = Tasks.tick(mia, cat.id, mia.id, day, false)
 
     # Ticking a waiting tick checks it too; "not yet" takes it away.
-    assert :ok = Tasks.tick(jo, cat.id, ruby.id, ~D[2026-10-20], true)
+    assert :ok = Tasks.tick(jo, cat.id, ruby.id, day, true)
     assert %{stars: 2} = Enum.find(Tasks.rewards(jo), &(&1.user_id == ruby.id))
-    :ok = Tasks.tick(ruby, cat.id, ruby.id, ~D[2026-10-21], true)
-    assert :ok = Tasks.check(jo, cat.id, ruby.id, ~D[2026-10-21], false)
-    assert {_, []} = Tasks.list(ruby, ~D[2026-10-21], ~D[2026-10-21])
+    :ok = Tasks.tick(ruby, cat.id, ruby.id, next, true)
+    assert :ok = Tasks.check(jo, cat.id, ruby.id, next, false)
+    assert {_, []} = Tasks.list(ruby, next, next)
     assert checks.(jo) == []
 
     # Grown-ups' own ticks never wait.
     {:ok, jos} = Tasks.create(jo, teeth([jo.id], %{"title" => "Bins"}))
-    assert :ok = Tasks.tick(jo, jos.id, jo.id, ~D[2026-10-20], true)
+    assert :ok = Tasks.tick(jo, jos.id, jo.id, day, true)
     assert checks.(admin) == []
   end
 

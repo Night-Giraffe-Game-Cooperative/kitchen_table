@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Avatar, Button, IconButton, Segmented } from '../components/ui';
-import { InfoTip } from '../components/tips';
-import { shuffle } from '../games/common';
-import { canSpeak, speakIn } from '../lib/speech';
-import { useStore } from '../lib/store';
-import { keyOf } from '../learn/phrases';
-import { bingoLines, spots } from '../learn/japanFun';
-import { ROAD_TEST, SignPicture, TRAIN_QUIZ, roadRules, roadSigns, signQuestion, trainQuestions, type Question } from '../learn/japanTravel';
+import { Avatar, Button, IconButton, Segmented } from '../../components/ui';
+import { InfoTip } from '../../components/tips';
+import { shuffle } from '../../games/common';
+import { canSpeak, speakIn } from '../../lib/speech';
+import { useStore } from '../../lib/store';
+import { keyOf } from './phrases';
+import { bingoLines, spots } from './japanFun';
+import { ROAD_TEST, SignPicture, TRAIN_QUIZ, roadRules, roadSigns, signQuestion, trainQuestions, type Question } from './japanTravel';
 
 // Getting about in Japan: things to spot and bullet train know-how for
 // everyone, and for the grown-ups who'll drive, the road signs and a road test.
