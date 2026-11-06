@@ -7,6 +7,7 @@
 #   powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 #   powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install -Serial <adb serial>
 #   powershell -ExecutionPolicy Bypass -File android\build.ps1 -Address https://192.168.1.20:4443
+#   powershell -ExecutionPolicy Bypass -File android\build.ps1 -Keystore <release keystore> -KeyAlias <alias> -KeystorePass <password>
 #
 # The app is android\build\KitchenTable.apk. -Install puts it on the tablet
 # plugged in over USB (USB debugging on). The address can be changed in the
@@ -16,14 +17,20 @@
 # ANDROID_HOME and JAVA_HOME, or where Android Studio puts them. It signs with
 # the SDK folder's debug.keystore if there is one, otherwise the usual
 # ~\.android\debug.keystore, which it makes the first time if need be. Keep the
-# same keystore, so a new build installs over the old one.
+# same keystore, so a new build installs over the old one. -Keystore,
+# -KeyAlias and -KeystorePass sign with another, like a release keystore.
+#
+# The Release workflow runs it too, on GitHub's Windows machines, to add the
+# app to each release (see part 5 of docs/getting-started.md).
 
 param(
     [string]$Address,
     [switch]$Install,
     [string]$Serial,
     [string]$Sdk = $(if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }),
-    [string]$Keystore
+    [string]$Keystore,
+    [string]$KeyAlias = 'androiddebugkey',
+    [string]$KeystorePass = 'android'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,7 +72,13 @@ if (-not $jdk) {
 }
 $env:JAVA_HOME = $jdk
 $env:Path = (Join-Path $jdk 'bin') + ';' + $env:Path
-if (-not $Keystore) {
+if ($Keystore) {
+    # A keystore made in its place would sign an app that won't install over the old one.
+    if (-not (Test-Path $Keystore)) {
+        Write-Host "Can't find the keystore $Keystore." -ForegroundColor Red
+        exit 1
+    }
+} else {
     $Keystore = Join-Path $Sdk 'debug.keystore'
     if (-not (Test-Path $Keystore)) { $Keystore = Join-Path $env:USERPROFILE '.android\debug.keystore' }
 }
@@ -120,9 +133,15 @@ try {
 
 Run 'Aligning' { & $zipalign -f -p 4 (Join-Path $out 'unsigned.apk') (Join-Path $out 'aligned.apk') }
 $apk = Join-Path $out 'KitchenTable.apk'
-Run 'Signing' {
-    & $apksigner sign --ks $Keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android `
-        --out $apk (Join-Path $out 'aligned.apk')
+# The password goes to apksigner through the environment, not its command line.
+$env:KITCHEN_TABLE_KS_PASS = $KeystorePass
+try {
+    Run 'Signing' {
+        & $apksigner sign --ks $Keystore --ks-pass env:KITCHEN_TABLE_KS_PASS --ks-key-alias $KeyAlias --key-pass env:KITCHEN_TABLE_KS_PASS `
+            --out $apk (Join-Path $out 'aligned.apk')
+    }
+} finally {
+    Remove-Item env:KITCHEN_TABLE_KS_PASS
 }
 Write-Host "Built $apk" -ForegroundColor Green
 

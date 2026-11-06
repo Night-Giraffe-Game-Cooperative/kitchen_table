@@ -200,6 +200,48 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 The app is `android\build\KitchenTable.apk`, if you'd rather copy it over
 yourself.
 
+**From a release.** Once Kitchen Table is [online](#9-put-it-online), GitHub
+can build the app with each release, so a tablet can have it without the SDK
+on a computer. The release then has `KitchenTable-<version>.apk` beside the
+server's, set to your address and signed with a release keystore of your
+own. Make one once, kept outside the repository and backed up (an app can
+only be updated by one signed with the same key); it asks for a password:
+
+```powershell
+keytool -genkeypair -keystore kitchen-table-release.keystore -storetype PKCS12 -alias kitchen_table -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Then put it in your copy's settings on GitHub (Settings, Secrets and
+variables, Actions), with the GitHub command line in your copy's folder:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('kitchen-table-release.keystore')) | gh secret set ANDROID_KEYSTORE
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh variable set ANDROID_KEY_ALIAS --body kitchen_table
+gh variable set APP_ADDRESS --body https://family.example.com
+```
+
+`gh secret set ANDROID_KEYSTORE_PASSWORD` asks for the password. Without
+`APP_ADDRESS` a release has no app, and without the keystore it says so in a
+warning and leaves the app out.
+
+To put a release's app on a tablet, download it there and open it, allowing
+that browser to install apps when Android asks (a private repository needs
+you signed in to GitHub there), or with it plugged in over USB:
+
+```powershell
+gh release download --pattern '*.apk'
+adb install -r KitchenTable-1.3.apk
+```
+
+`build.ps1` signs with the debug keystore and a release with the release
+keystore, so neither installs over the other: on a tablet with the app from
+`build.ps1`, remove the old app first (`adb uninstall
+com.nightgiraffe.kitchentable`, or hold its icon and uninstall), and sign in
+again afterwards. `build.ps1 -Keystore kitchen-table-release.keystore
+-KeyAlias kitchen_table -KeystorePass <password>` builds one that matches the
+releases.
+
 Downloads, like a photo saved from a chat, go to the tablet's Downloads
 folder, with a notification when each one is done. Kitchen Table's own
 notifications work in the app too: switch them on under **Me**, and allow

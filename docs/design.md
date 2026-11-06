@@ -685,3 +685,18 @@ isn't in the menu, its server addresses don't answer, and its code and
 recordings are never downloaded. Switching it off keeps what everyone has
 learned for when it's back.
 
+6 Nov 2026. Each release can carry the Android app. Asked for so a new
+version of the app comes with the release instead of needing the SDK on a
+computer at home. The Release workflow runs android/build.ps1 itself, on
+GitHub's Windows machines, after the server's release is up, and adds
+KitchenTable-<version>.apk to it, named for the app's own version, which
+goes up separately (and so deploy.ps1, fetching kitchen-table-*.tar.gz,
+never picks it up). The address the app opens is a variable, APP_ADDRESS,
+and the release keystore, its password and alias are secrets and a
+variable, so none of them is in the code. A copy without the address builds
+no app, and one without the keystore leaves it out with a warning rather
+than signing with a keystore made on the spot, which nothing could update.
+The release is signed with a release keystore rather than build.ps1's debug
+one, which stays the default for building at home, so an app from a release
+and one from build.ps1 don't install over each other.
+
